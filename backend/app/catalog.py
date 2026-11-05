@@ -10,6 +10,7 @@ import re
 from decimal import Decimal
 from enum import StrEnum
 from itertools import product
+from typing import Literal
 
 import psycopg
 from psycopg.rows import dict_row
@@ -23,8 +24,8 @@ MAX_CLOSEST = 3
 DEFAULT_LIMIT = 5
 
 ALIAS = re.compile(r"[1-7][A-Z]")
-# Below this length a text is too short to be the start of a part number.
-MIN_PREFIX_LENGTH = 4
+# "76" is the whole series; from "761" on, a text can name a group of models.
+MIN_PREFIX_LENGTH = 3
 FIXED_CONDITIONS = {"enclosure", "voltage_v", "phases", "current_type", "service", "certification"}
 
 NOTE_NO_DATA = "The table lists this model as N/A: it exists, but the PDF gives no values for it."
@@ -75,7 +76,7 @@ class Requirements(BaseModel):
     voltage_v: int | None = Field(None, description="Supply voltage in volts.")
     phases: int | None = Field(None, description="Number of power phases: 1 or 3.")
     current_type: Current | None = Field(None, description="AC or DC.")
-    frequency_hz: int | None = Field(None, description="Power frequency: 50 or 60.")
+    frequency_hz: Literal[50, 60] | None = Field(None, description="Power frequency. The tables only list 50 and 60 Hz.")
     max_speed_sec: float | None = Field(None, gt=0, description="Maximum time for a 90-degree turn, in seconds.")
     min_duty_cycle_pct: float | None = Field(None, gt=0, description="Minimum duty cycle, as a percentage.")
     min_cycles_per_hour: int | None = Field(None, gt=0, description="Minimum On/Off cycles per hour.")
@@ -276,7 +277,13 @@ def _condition_differences(service: dict, electrical: dict, req: Requirements) -
     if req.min_torque is not None:
         column, required = _required_torque(req)
         if service[column] < required:
-            differences.append(_difference(f"min_torque_{req.torque_unit.value}", req.min_torque, service[column]))
+            # Name both units: 79,700 in-lbs must not read as a value in the ft-lb the user asked for.
+            differences.append({
+                **_difference("min_torque", req.min_torque, service[column]),
+                "requested_unit": req.torque_unit.value,
+                "required_in_table_unit": float(required),
+                "table_unit": column.removeprefix("torque_"),
+            })
     if req.min_duty_cycle_pct is not None and service["duty_cycle_pct"] < req.min_duty_cycle_pct:
         differences.append(_difference("min_duty_cycle_pct", req.min_duty_cycle_pct, service["duty_cycle_pct"]))
     for field, column in (("min_cycles_per_hour", "cycles_per_hour"), ("min_starts_per_hour", "starts_per_hour")):
@@ -337,22 +344,34 @@ def _match_notes(actuator: dict, req: Requirements, evaluation: dict) -> list[st
     return notes
 
 
+def _is_fixed(difference: dict) -> bool:
+    """Something the plant cannot adjust, or a value this rating does not have at all."""
+    return difference["requirement"] in FIXED_CONDITIONS or difference["actual"] is None
+
+
+def _relative_gap(difference: dict) -> float:
+    if _is_fixed(difference):
+        return 0
+    requested = difference.get("required_in_table_unit", difference["requested"])
+    return abs(float(requested) - float(difference["actual"])) / float(requested)
+
+
 def _closeness(actuator: dict, condition: dict, req: Requirements) -> tuple:
     """Rank alternatives. Lower is closer.
 
     A plant can tolerate a slightly slower actuator, but it cannot change its supply voltage. So
-    differences in fixed conditions weigh first, then the number of differences, the torque
-    shortfall and finally the excess torque.
+    differences in fixed conditions weigh first, with the voltage as the hardest of them, then the
+    number of differences, how far each number is from what was asked and finally the excess torque.
     """
-    torque = _torque_for_sorting(condition, req)
-    shortfall = Decimal(0)
-    if req.min_torque is not None:
-        required = _required_torque(req)[1]
-        if torque < required:
-            shortfall = (required - torque) / required
     differences = condition["differences"]
-    fixed = sum(d["requirement"] in FIXED_CONDITIONS for d in differences)
-    return fixed, len(differences), shortfall, torque, actuator["part_number"]
+    return (
+        sum(_is_fixed(d) for d in differences),
+        any(d["requirement"] == "voltage_v" for d in differences),
+        len(differences),
+        sum(_relative_gap(d) for d in differences),
+        _torque_for_sorting(condition, req),
+        actuator["part_number"],
+    )
 
 
 def _closest(actuators: list[dict], req: Requirements) -> list[dict]:

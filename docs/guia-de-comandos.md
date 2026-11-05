@@ -111,6 +111,53 @@ uv run --group extract python ingest.py --audit
 
 Reutiliza las páginas ya leídas en `audit/pages/`. Para que Gemini lea otra vez, borra los archivos de ese modelo o cambia `AUDIT_MODEL` en `.env`.
 
+## Probar las tools a mano
+
+Estos comandos van desde `backend/` y necesitan la base levantada con los datos cargados. Llaman a las mismas tools que usará el agente, sin LLM, así que no gastan presupuesto.
+
+Buscar un modelo, por part number o alias:
+
+```bash
+uv run python try_tools.py specs 762A00-11300000/A
+```
+
+Elegir entre varios modelos con el mismo alias:
+
+```bash
+uv run python try_tools.py specs 1A --voltage 110
+```
+
+Buscar por requisitos:
+
+```bash
+uv run python try_tools.py recommend min_torque=500 torque_unit=nm service=on_off voltage_v=110
+```
+
+Ver qué opciones existen:
+
+```bash
+uv run python try_tools.py options
+```
+
+Agrega `--full` al final para ver el resultado completo, tal como lo recibe el agente.
+
+| Requisito | Valores |
+|---|---|
+| `min_torque` y `torque_unit` | Un número, y `nm`, `in_lbs`, `ft_lbs` o `kgf_m` |
+| `service` | `on_off` o `modulating` |
+| `enclosure` | `weatherproof` o `explosionproof` |
+| `voltage_v` | 24, 110 o 220 |
+| `phases` | 1 o 3 |
+| `current_type` | `AC` o `DC` |
+| `frequency_hz` | 50 o 60 |
+| `max_speed_sec` | Segundos para girar 90° |
+| `min_duty_cycle_pct` | Porcentaje |
+| `min_cycles_per_hour`, `min_starts_per_hour` | Un número |
+| `max_fla_a`, `max_lra_a` | Amperios |
+| `max_motor_power_w` | Vatios |
+| `certification` | `CSA`, `CE` o `UKCA` |
+| `limit` | Cuántos modelos mostrar, hasta 20 |
+
 ## Tests
 
 Estos comandos van desde `backend/`.

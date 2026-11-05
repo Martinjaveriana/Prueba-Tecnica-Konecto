@@ -242,7 +242,7 @@ La lógica está en `backend/app/catalog.py` y se prueba sin LLM. `backend/app/t
 | Si no dice modo o frecuencia, mostrar e indicar la condición | `763A00-11300000/A` tarda 25 s a 60 Hz y 31 s a 50 Hz; pedir "menos de 30 s" cumple solo a 60 Hz | Preguntar siempre antes de buscar |
 | Si nada cumple, decirlo y sugerir el más cercano explicando las diferencias | El usuario sabe que no es lo pedido y aun así tiene una opción | Responder solo "no hay ninguno" |
 | Nunca sugerir Weatherproof si piden Explosionproof | Ese requisito suele existir por riesgo de explosión | Tratarlo como cualquier otra diferencia |
-| Entre alternativas, pesa más lo que no se puede cambiar | Una planta tolera 1 s más, pero no cambia su voltaje | Contar todas las diferencias igual: ponía un modelo de 220 V junto a uno de 110 V |
+| Entre alternativas, pesa más lo que no se puede cambiar, y el voltaje por encima de todo | Una planta tolera 1 s más, pero no cambia su voltaje | Contar todas las diferencias igual: ponía un modelo de 220 V junto a uno de 110 V |
 | Comparar el torque en la columna de la unidad pedida | El PDF redondea: 880 in-lbs figura como 100 Nm, y 100 Nm son unos 885 in-lbs. Convertir descartaría un modelo que sí cumple | Convertir todo a una unidad |
 | Convertir solo lo que el PDF no trae, con código | 1 ft-lb son exactamente 12 in-lbs. El LLM no debe calcular números | Dejar la conversión al LLM |
 | Exigir la unidad si dan un torque | "500" sin unidad puede ser 500 Nm o 500 in-lbs, una diferencia de casi 9 veces | Suponer una unidad |
@@ -251,6 +251,18 @@ La lógica está en `backend/app/catalog.py` y se prueba sin LLM. `backend/app/t
 | Un part number inexistente se trata como inexistente | `761A00-11380000/A`, el ejemplo del summary, no está en las tablas | Corregirlo solo |
 
 Texto del aviso de 3 fases: "Encontré `763B00-11330C00/A`, de 500 Nm. Ojo: la tabla no indica si ese valor aplica a Modulating."
+
+**Errores que encontraron las pruebas a mano y ya están corregidos, cada uno con su test:**
+
+| Entrada | Qué pasaba | Ahora |
+|---|---|---|
+| `frequency_hz=40` | El programa fallaba | Responde que las tablas solo tienen 50 y 60 Hz |
+| `min_torque=100000 torque_unit=ft_lbs` | Comparaba 100 000 con 79 700 sin aclarar que el segundo está en in-lbs | Indica la unidad de cada valor |
+| `min_cycles_per_hour=1000` | La alternativa decía "actual: None" porque usaba Modulating, que no tiene ciclos | Sugiere el modelo con más ciclos, 350 en `761X30-11380000/A` |
+| `761` | Decía que no existía | Lista el grupo: 14 modelos |
+| `voltage_v=24 current_type=AC service=modulating` | Sugería modelos de 110 V y 220 V, sin mostrar los de 24 V | Primero conserva el voltaje: sugiere `761X30-11370000/A`, de 24 V DC |
+
+**Límite conocido:** el orden de las alternativas es una regla razonable, no una verdad de ingeniería. Cuál sirve realmente depende de la planta, y por eso cada alternativa muestra sus diferencias.
 
 ### Proyecto
 

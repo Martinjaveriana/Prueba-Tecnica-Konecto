@@ -73,6 +73,13 @@ def test_an_alias_or_partial_number_with_several_models_is_ambiguous(text, count
     assert "actuator" not in result
 
 
+def test_a_short_prefix_lists_its_group_and_says_how_many_there_are():
+    result = find_actuator("761")
+    assert result["status"] == "ambiguous"
+    assert result["total"] == 14
+    assert len(result["options"]) == catalog.MAX_OPTIONS
+
+
 def test_an_alias_with_a_single_model_is_found():
     assert find_actuator("6A")["actuator"]["part_number"] == "766A00-11320000/A"
 
@@ -295,12 +302,52 @@ def test_too_much_torque_offers_the_strongest_model():
     result = recommend(req(enclosure="explosionproof", min_torque=10000, torque_unit="nm", service="on_off"))
     closest = result["closest"][0]
     assert closest["part_number"].startswith("765Y30")
-    assert closest["differences"] == [{"requirement": "min_torque_nm", "requested": 10000, "actual": 3000}]
+    assert closest["differences"] == [
+        {
+            "requirement": "min_torque",
+            "requested": 10000,
+            "actual": 3000,
+            "requested_unit": "nm",
+            "required_in_table_unit": 10000,
+            "table_unit": "nm",
+        }
+    ]
 
 
-def test_24v_ac_modulating_does_not_exist():
+def test_a_difference_in_a_converted_unit_names_both_units():
+    # 79,700 is in-lbs, and the request was in ft-lb: without the units it would read as 100,000 vs 79,700.
+    result = recommend(req(min_torque=100000, torque_unit="ft_lbs"))
+    difference = result["closest"][0]["differences"][0]
+    assert difference["actual"] == 79700
+    assert difference["table_unit"] == "in_lbs"
+    assert difference["requested_unit"] == "ft_lbs"
+    assert difference["required_in_table_unit"] == 1200000
+
+
+def test_closest_uses_a_rating_that_has_the_requested_value():
+    # Only On/Off ratings have cycles per hour: the alternative must not report "None" from Modulating.
+    result = recommend(req(min_cycles_per_hour=1000))
+    closest = result["closest"][0]
+    assert closest["part_number"] == "761X30-11380000/A"
+    assert closest["differences"] == [{"requirement": "min_cycles_per_hour", "requested": 1000, "actual": 350}]
+
+
+@pytest.mark.parametrize("hz", [40, 55, 0])
+def test_a_frequency_the_tables_do_not_list_is_rejected(hz):
+    with pytest.raises(ValidationError):
+        Requirements(frequency_hz=hz, min_torque=500, torque_unit="nm")
+    message = recommend_actuators.invoke({"frequency_hz": hz, "min_torque": 500, "torque_unit": "nm"})
+    assert isinstance(message, str)
+    assert "50" in message and "60" in message
+
+
+def test_24v_ac_modulating_does_not_exist_and_alternatives_keep_the_voltage():
     result = recommend(req(voltage_v=24, current_type="AC", service="modulating"))
     assert result["status"] == "no_matches"
+    closest = result["closest"][0]
+    assert closest["part_number"] == "761X30-11370000/A"
+    assert closest["differences"] == [{"requirement": "current_type", "requested": "AC", "actual": "DC"}]
+    assert {model["voltage_v"] for model in result["closest"]} == {24}
 
 
 def test_weatherproof_24v_does_not_exist_and_each_alternative_explains_its_difference():
