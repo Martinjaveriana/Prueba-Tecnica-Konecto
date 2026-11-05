@@ -1,0 +1,24 @@
+[project]
+name = "series76-backend"
+version = "0.1.0"
+description = "Series 76 technical assistant backend"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "psycopg[binary]>=3.2",
+    "pydantic-settings>=2.6",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+extract = [
+    "docling>=2.147.0",
+    "google-genai>=2.34.0",
+    "pymupdf>=2.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

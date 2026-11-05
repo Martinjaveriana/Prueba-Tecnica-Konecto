@@ -1,0 +1,27 @@
+# Secrets: only .env.example is versioned
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Android / Gradle (for the android/ app)
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+captures/
+*.apk
+*.aab
+
+# Claude Code: personal settings stay local; shared .claude/ config is a deliverable
+.claude/settings.local.json
+
+# OS
+.DS_Store

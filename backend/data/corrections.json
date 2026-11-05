@@ -1,0 +1,8 @@
+[
+ {"part_number": "763C00-11300000/A", "field": "speed_60", "read": "£3", "value": 33, "reason": "Docling misread the digit. PDF page 1, Weatherproof 110V table, shows 33."},
+ {"part_number": "764A00-11320000/A", "field": "speed_50", "read": "£3", "value": 33, "reason": "Docling misread the digit. PDF page 1, Weatherproof 220V table, shows 33."},
+ {"part_number": "765X30-11300000/A", "field": "speed_60", "read": "£6", "value": 93, "reason": "Docling misread the digit. PDF page 4, Explosionproof 110V table, shows 93."},
+ {"part_number": "765Y30-11300000/A", "field": "speed_60", "read": "", "value": 93, "reason": "Docling left the cell empty. PDF page 4, Explosionproof 110V table, shows 93."},
+ {"part_number": "765X30-11320000/A", "field": "speed_60", "read": "£6", "value": 93, "reason": "Docling misread the digit. PDF page 4, Explosionproof 220V table, shows 93."},
+ {"part_number": "765Y30-11320000/A", "field": "speed_60", "read": "£6", "value": 93, "reason": "Docling misread the digit. PDF page 4, Explosionproof 220V table, shows 93."}
+]
