@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Series 76 technical assistant backend"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "langchain>=1.4.9",
     "psycopg[binary]>=3.2",
     "pydantic-settings>=2.6",
 ]

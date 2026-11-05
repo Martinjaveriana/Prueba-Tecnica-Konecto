@@ -53,6 +53,7 @@ No hay linter configurado todavía.
 ## Estructura
 - `backend/`: Python 3.12 gestionado con `uv`. La configuración está en `app/config.py` y lee el `.env` de la raíz.
 - `backend/ingestion/`: la ingesta en etapas. `spec.py` declara la estructura de las 7 tablas, `extract.py` lee con Docling, `build.py` limpia y valida, `load.py` carga y `audit.py` compara con el modelo de visión.
+- `backend/app/catalog.py`: las consultas y las reglas de búsqueda, sin LLM. `backend/app/tools.py` las expone como tools de LangChain; la lógica va en `catalog.py`.
 - `backend/data/`: `raw/` (lo que leyó Docling), `corrections.json` (correcciones registradas), `processed/actuators.json` (la fuente de la carga). Un valor mal leído se resuelve en `corrections.json`, nunca editando `processed/`.
 - `android/`: app en Kotlin + Jetpack Compose (aún no existe).
 - `docs/`: enunciado (`assessment-en.pdf`) y los PDFs fuente.
@@ -166,12 +167,6 @@ Trampas que el código debe respetar:
 
 ## Diseño previsto (sin implementar)
 
-### Tools de LangChain
-- `get_actuator_specs(base_part_number)`: acepta minúsculas, espacios, `*`, números parciales y alias. Si no existe → error claro + part numbers parecidos.
-- `recommend_actuators(requisitos)`: filtros tipados → SQL parametrizado. Si nada cumple → decirlo y mostrar los más cercanos indicando qué requisito no cumplen.
-- Posible `list_available_options()`: valores válidos, para resolver ambigüedades.
-- Las tools devuelven **JSON estructurado**. Nunca SQL libre generado por el LLM.
-
 ### Respuesta de la API
 ```json
 {
@@ -196,7 +191,7 @@ URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat
 ## Plan de trabajo (4–11 nov)
 1. **Fase 0, hecha:** estructura del repo, Postgres en Docker, test de conexión.
 2. **Fase 1, hecha:** `ingest.py`, validación, tests y esquema. Repetir `--extract` da archivos idénticos. La auditoría con `gemini-3.5-flash` comparó 869 celdas y encontró una diferencia, en la que el PDF confirma nuestro dato.
-3. **Fase 2:** tools y pruebas de edge cases sin LLM.
+3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
 4. **Fase 3:** agente, FastAPI, persistencia de sesiones, Dockerfile.
 5. **Fase 4:** app Android.
 6. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.

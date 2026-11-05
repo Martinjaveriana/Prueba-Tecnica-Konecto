@@ -123,6 +123,14 @@ Los de carga y conexión necesitan la base levantada.
 uv run pytest
 ```
 
+### Correr solo los tests de las tools
+
+Prueban las consultas y los edge cases sin LLM, así que no gastan presupuesto. Necesitan la base levantada.
+
+```bash
+uv run pytest tests/test_catalog.py
+```
+
 ### Correr solo los tests de los datos
 
 No necesitan la base.

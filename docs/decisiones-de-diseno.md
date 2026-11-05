@@ -204,12 +204,48 @@ Detalles a tener en cuenta:
 | RapidOCR solo | 68 filas, pero cruza columnas y leyó 06 en vez de 90 |
 | **Docling** | **7 tablas y columnas correctas; 6 velocidades mal leídas, todas detectables** |
 
-### Comportamiento del agente (se implementa en la Fase 2)
+### Tools del agente (Fase 2)
+
+La lógica está en `backend/app/catalog.py` y se prueba sin LLM. `backend/app/tools.py` solo la expone a LangChain.
+
+| Tool | Para qué |
+|---|---|
+| `get_actuator_specs` | Buscar un modelo por part number, parte de él o alias |
+| `recommend_actuators` | Buscar modelos por requisitos técnicos |
+| `list_available_options` | Decir qué voltajes, carcasas, rangos y certificaciones existen |
+
+**Qué responde `get_actuator_specs`:**
+
+| El usuario escribe | `status` | Qué recibe el agente |
+|---|---|---|
+| `761a00-11300000/a` | `found` | Los datos del modelo |
+| `1A` o `761A00` | `ambiguous` | 3 opciones, para mostrarlas o preguntar |
+| `761A00-11330C00/A` | `no_data` | El modelo existe, pero la tabla dice N/A |
+| `761800-11300000/A` | `not_found` | Sugiere `761B00-11300000/A`, sin cambiarlo solo |
+| Nada | `invalid` | Que no se dio ningún número |
+
+**Qué responde `recommend_actuators`:**
+
+| Situación | `status` | Qué recibe el agente |
+|---|---|---|
+| Hay modelos que cumplen | `matches` | Solo esos, primero el más ajustado, y bajo qué condición cumple cada uno |
+| Ninguno cumple | `no_matches` | Instrucción de decirlo primero, y los 3 más cercanos con cada diferencia |
+| No dio requisitos | `needs_requirements` | Que debe preguntarlos |
 
 | Decisión | Por qué | Descartado |
 |---|---|---|
+| Tools fijas, el LLM nunca escribe SQL | Una condición mal escrita daría un dato equivocado que parece correcto | SQL generado por el LLM: más flexible, pero menos fiable |
+| Evaluar los requisitos en Python sobre filas leídas con SQL fijo | Una sola función decide si un modelo cumple y explica por qué no; con 68 modelos el rendimiento no importa | Filtrar con `WHERE` y explicar los rechazos aparte: dos lógicas que podrían contradecirse |
+| Mostrar solo los que cumplen si hay alguno | Lo pedido primero; alternativas solo si hacen falta | Mezclar alternativas con los que cumplen |
+| Primero el modelo más ajustado | Un actuador mucho mayor suele ser innecesario | Primero el más potente |
+| Hasta 5 modelos, indicando el total | Evita respuestas enormes que además gastan presupuesto | Devolver todos: pueden ser decenas |
+| Si no dice modo o frecuencia, mostrar e indicar la condición | `763A00-11300000/A` tarda 25 s a 60 Hz y 31 s a 50 Hz; pedir "menos de 30 s" cumple solo a 60 Hz | Preguntar siempre antes de buscar |
+| Si nada cumple, decirlo y sugerir el más cercano explicando las diferencias | El usuario sabe que no es lo pedido y aun así tiene una opción | Responder solo "no hay ninguno" |
+| Nunca sugerir Weatherproof si piden Explosionproof | Ese requisito suele existir por riesgo de explosión | Tratarlo como cualquier otra diferencia |
+| Entre alternativas, pesa más lo que no se puede cambiar | Una planta tolera 1 s más, pero no cambia su voltaje | Contar todas las diferencias igual: ponía un modelo de 220 V junto a uno de 110 V |
 | Comparar el torque en la columna de la unidad pedida | El PDF redondea: 880 in-lbs figura como 100 Nm, y 100 Nm son unos 885 in-lbs. Convertir descartaría un modelo que sí cumple | Convertir todo a una unidad |
-| Convertir solo lo que el PDF no trae, con código | El LLM no debe calcular números | Dejar la conversión al LLM |
+| Convertir solo lo que el PDF no trae, con código | 1 ft-lb son exactamente 12 in-lbs. El LLM no debe calcular números | Dejar la conversión al LLM |
+| Exigir la unidad si dan un torque | "500" sin unidad puede ser 500 Nm o 500 in-lbs, una diferencia de casi 9 veces | Suponer una unidad |
 | Las tablas de 3 fases se guardan con servicio "sin especificar" | El PDF da un solo torque y no dice a qué modo aplica | Copiarlo a On/Off y Modulating: afirma algo que el PDF no dice |
 | Mostrarlas al filtrar por modo, con un aviso | Si no, ningún modelo de 3 fases aparecería al pedir un modo | Buscar solo la etiqueta exacta |
 | Un part number inexistente se trata como inexistente | `761A00-11380000/A`, el ejemplo del summary, no está en las tablas | Corregirlo solo |
