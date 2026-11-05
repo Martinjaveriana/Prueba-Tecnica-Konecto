@@ -11,7 +11,11 @@ import json
 import sys
 from decimal import Decimal
 
+import psycopg
+
 from app.config import BACKEND_DIR, REPO_ROOT
+
+OPTIONAL_MODULES = {"docling", "google", "pymupdf"}
 
 PDF_PATH = REPO_ROOT / "docs" / "series_76_electric_data.pdf"
 RAW_PATH = BACKEND_DIR / "data" / "raw" / "docling_tables.json"
@@ -72,17 +76,28 @@ def main() -> int:
     mode.add_argument("--audit", action="store_true")
     args = parser.parse_args()
 
-    if args.extract:
-        from ingestion.extract import extract_raw
+    try:
+        if args.extract:
+            from ingestion.extract import extract_raw
 
-        extract_raw(PDF_PATH, RAW_PATH)
-        print(f"Raw tables -> {RAW_PATH}")
-        return run_build()
-    if args.build:
-        return run_build()
-    if args.audit:
-        return run_audit()
-    return run_load()
+            extract_raw(PDF_PATH, RAW_PATH)
+            print(f"Raw tables -> {RAW_PATH}")
+            return run_build()
+        if args.build:
+            return run_build()
+        if args.audit:
+            return run_audit()
+        return run_load()
+    except ModuleNotFoundError as error:
+        if (error.name or "").partition(".")[0] not in OPTIONAL_MODULES:
+            raise
+        print("--extract and --audit need the optional dependencies. Run, from backend/:")
+        print(f"  uv run --group extract python ingest.py {' '.join(sys.argv[1:])}")
+        return 2
+    except psycopg.OperationalError:
+        print("Cannot connect to the database. Start it, from the root of the repository:")
+        print("  docker compose up -d --wait db")
+        return 2
 
 
 if __name__ == "__main__":

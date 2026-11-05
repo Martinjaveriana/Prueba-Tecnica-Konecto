@@ -139,12 +139,11 @@ def compare(actuators: list[dict], rows: dict[str, RowReading]) -> list[dict]:
     return differences
 
 
-def audit(pdf_path: Path, processed_path: Path, report_path: Path) -> int:
-    if not settings.google_api_key:
-        print("Set GOOGLE_API_KEY in .env to run the audit.")
-        return 2
+def has_real_key() -> bool:
+    return bool(settings.google_api_key) and not settings.google_api_key.startswith("your-")
 
-    client = genai.Client(api_key=settings.google_api_key)
+
+def audit(pdf_path: Path, processed_path: Path, report_path: Path) -> int:
     actuators = json.loads(processed_path.read_text(encoding="utf-8"))
 
     # Each page read is kept, so a failure does not spend the free quota on it again.
@@ -158,8 +157,13 @@ def audit(pdf_path: Path, processed_path: Path, report_path: Path) -> int:
         if saved.exists():
             reading = PageReading.model_validate_json(saved.read_text(encoding="utf-8"))
         else:
+            # The readings saved in the repository can be compared again without a key.
+            if not has_real_key():
+                print(f"There is no saved reading from {settings.audit_model}. Set GOOGLE_API_KEY in .env to read the PDF.")
+                return 2
             print(f"Reading page {number} with {settings.audit_model}...")
             try:
+                client = genai.Client(api_key=settings.google_api_key)
                 reading = read_page(client, page.get_pixmap(dpi=RENDER_DPI).tobytes("png"))
             except errors.APIError as error:
                 print(f"The model did not answer ({error.code}): {error.message}. Try again later or change AUDIT_MODEL.")

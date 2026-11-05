@@ -103,13 +103,13 @@ uv run --group extract python ingest.py --extract
 
 ### Auditar
 
-Gemini lee el PDF y `audit/report.json` guarda las diferencias con `processed/actuators.json`. No cambia los datos. Necesita `GOOGLE_API_KEY` en `.env`.
+Compara lo que leyó Gemini con `processed/actuators.json` y guarda las diferencias en `audit/report.json`. No cambia los datos.
 
 ```bash
 uv run --group extract python ingest.py --audit
 ```
 
-Reutiliza las páginas ya leídas en `audit/pages/`. Para que Gemini lea otra vez, borra los archivos de ese modelo o cambia `AUDIT_MODEL` en `.env`.
+Reutiliza las páginas ya leídas en `audit/pages/`, que están en el repo, así que no necesita clave para el modelo ya usado. Para que Gemini lea otra vez, borra los archivos de ese modelo o cambia `AUDIT_MODEL` en `.env`; en ese caso sí necesita `GOOGLE_API_KEY` en `.env`.
 
 ## Probar las tools a mano
 
@@ -190,9 +190,11 @@ uv run pytest tests/test_build.py
 
 | Mensaje | Qué significa | Qué hacer |
 |---|---|---|
-| `Connection refused` | La base no está levantada | [Levantar la base](#levantar-la-base) |
+| `Cannot connect to the database` | La base no está levantada | [Levantar la base](#levantar-la-base) |
+| `can't open file ... ingest.py` | No estás en `backend/` | `cd backend` primero |
+| `--extract and --audit need the optional dependencies` | Falta `--group extract` | Usar el comando que muestra el mensaje |
 | `N problems, nothing was written` | Un valor o una regla no pasó la validación | Revisar esa celda en el PDF y, si fue un error de lectura, seguir [guia-de-correcciones.md](guia-de-correcciones.md) |
 | `correction expects ...` | Docling leyó algo distinto a lo que espera una corrección | Mirar la celda en el PDF y actualizar la corrección |
-| `Set GOOGLE_API_KEY in .env` | Falta la clave | Agregarla a `.env` |
+| `There is no saved reading` | Ese modelo no se ha usado en la auditoría y falta la clave | Agregar `GOOGLE_API_KEY` a `.env` |
 | `no longer available` | Google retiró ese modelo | Cambiar `AUDIT_MODEL` en `.env` |
 | `The model did not answer (503)` | El modelo está saturado | Reintentar más tarde o cambiar `AUDIT_MODEL` |
