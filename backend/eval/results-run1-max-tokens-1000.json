@@ -1,0 +1,723 @@
+[
+ {
+  "model": "qwen/qwen3.7-flash",
+  "passed": 14,
+  "total": 14,
+  "unverified_numbers": 5,
+  "cost_usd": 0.0017,
+  "seconds": 146,
+  "median_seconds": 8.5,
+  "cases": [
+   {
+    "case": "lookup",
+    "expectation": "looks up the model and states 150 Nm",
+    "passed": true,
+    "answer": "The output torque for **762A00-11300000/A** depends on the service type:\n* **Modulating service:** 1150 in-lbs (130 Nm)\n* **On/Off service:** 1330 in-lbs (150 Nm)",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 7235
+   },
+   {
+    "case": "follow_up",
+    "expectation": "looks the model up again and states 40 W",
+    "passed": true,
+    "answer": "El actuador 762A00-11300000/A tiene una potencia de motor de **40 W**.\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 13312
+   },
+   {
+    "case": "follow_up_alias",
+    "expectation": "resolves the 2A at 110 V and states 2.3 A",
+    "passed": true,
+    "answer": "At 110 V and 60 Hz, the full load current (FLA) for the Series 76 actuator with alias **2A** (part number **762A00-11300000/A**) is **2.3 A**.\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "2A"
+      }
+     },
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 26067
+   },
+   {
+    "case": "ambiguous_alias",
+    "expectation": "shows the 3 options or asks which one",
+    "passed": true,
+    "answer": "There are three Series 76 models that match the alias **1A**. Please let me know which one you need by specifying the voltage or service type:\n\n*   **761A00-11300000/A**: 110V AC, 1-phase (On/Off & Modulating)\n*   **761A00-11320000/A**: 220V AC, 1-phase (On/Off & Modulating)\n*   **761A00-11330C00/A**: 220V AC, 3-phase",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "1A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 6621
+   },
+   {
+    "case": "mistyped",
+    "expectation": "says it does not exist and suggests 761B00-11300000/A",
+    "passed": true,
+    "answer": "The part number **761800-11300000/A** is not in the Series 76 tables.\n\nDid you mean one of these similar models?\n*   **761B00-11300000/A** (alias: 1B)\n*   **761A00-11300000/A** (alias: 1A)\n*   **765B00-11300000/A** (alias: 5B)",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761800-11300000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 8096
+   },
+   {
+    "case": "summary_example",
+    "expectation": "says it is not in the tables",
+    "passed": true,
+    "answer": "That part number is not in the Series 76 tables. \n\nCould you be looking for one of these instead?\n* **761A00-11320000/A** (Alias: 1A, 220V AC)\n* **761A00-11300000/A** (Alias: 1A, 110V AC)\n* **767A00-11320000/A** (Alias: 7A, 220V AC)",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11380000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 6170
+   },
+   {
+    "case": "na_model",
+    "expectation": "says the table lists it as N/A",
+    "passed": true,
+    "answer": "The table gives no values for **761A00-11330C00/A**; it is listed as N/A in the documentation. \n\nIf you need a similar weatherproof actuator with available data, consider these alternatives:\n- **761A00-11300000/A** (110V AC, 1-phase)\n- **761A00-11320000/A** (220V AC, 1-phase)\n- **763A00-11330C00/A** (220V AC, 3-phase)\n\nLet me know if you'd like the technical specifications for any of these models.",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11330C00/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 10446
+   },
+   {
+    "case": "recommend",
+    "expectation": "recommends 763B00-11300000/A first",
+    "passed": true,
+    "answer": "",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110,
+       "min_torque": 500,
+       "torque_unit": "nm",
+       "limit": 5
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 13223
+   },
+   {
+    "case": "impossible",
+    "expectation": "says none qualifies and offers 763Y30",
+    "passed": true,
+    "answer": "No model meets every requirement. Here are the closest options, all differing only by being 1-phase instead of 3-phase:\n\n* **763Y30-11300000/A**: Provides 450 Nm in On/Off service. Enclosure and torque match, but it is 1-phase.\n* **763Y30-11320000/A**: Provides 450 Nm in On/Off service. Enclosure and torque match, but it is 1-phase.\n* **764X30-11300000/A**: Provides 800 Nm in On/Off service (640 Nm Modulating). Enclosure and torque exceed requirements, but it is 1-phase.",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "enclosure": "explosionproof",
+       "min_torque": 400,
+       "phases": 3,
+       "torque_unit": "nm"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 14051
+   },
+   {
+    "case": "three_phase",
+    "expectation": "offers 763B00-11330C00/A with the 3-phase warning",
+    "passed": true,
+    "answer": "Aquí tienes los actuadores modulating de 3 fases que cumplen con al menos 400 Nm de par:\n\n1. **763B00-11330C00/A** (alias 3B)\n   - Par: 500 Nm\n   - Voltaje: 220 V AC\n   - Velocidad: 26 s (60 Hz) / 32 s (50 Hz)\n   - FLA: 2.0 A, LRA: 2.4 A\n   - Certificaciones: CSA, CE, UKCA\n   - Nota: La tabla no especifica si este valor aplica a Modulating.\n\n2. **763C00-11330C00/A** (alias 3C)\n   - Par: 600 Nm\n   - Voltaje: 220 V AC\n   - Velocidad: 32 s (60 Hz) / 39 s (50 Hz)\n   - FLA: 2.0 A, LRA: 2.4 A\n   - Certificaciones: CSA, CE, UKCA\n   - Nota: La tabla no especifica si este valor aplica a Modulating.\n\n3. **764A00-11330C00/A** (alias 4A)\n   - Par: 800 Nm\n   - Voltaje: 220 V AC\n   - Velocidad: 29 s (60 Hz) / 35 s (50 Hz)\n   - FLA: 3.4 A, LRA: 4.0 A\n   - Certificaciones: CSA, CE, UKCA\n   - Nota: La tabla no especifica si este valor aplica a Modulating.\n\n4. **764B00-11330C00/A** (alias 4B)\n   - Par: 1200 Nm\n   - Voltaje: 220 V AC\n   - Velocidad: 36 s (60 Hz) / 43 s (50 Hz)\n   - FLA: 3.4 A, LRA: 4.0 A\n   - Certificaciones: CSA, CE, UKCA\n   - Nota: La tabla no especifica si este valor aplica a Modulating.\n\n5. **765A00-11330C00/A** (alias 5A)\n   - Par: 2000 Nm\n   - Voltaje: 220 V AC\n   - Velocidad: 88 s (60 Hz) / 105 s (50 Hz)\n   - FLA: 3.4 A, LRA: 4.0 A\n   - Certificaciones: CSA, CE, UKCA\n   - Nota: La tabla no especifica si este valor aplica a Modulating.\n\n¿Te interesa alguno en particular o necesitas más detalles?",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "service": "modulating",
+       "phases": 3,
+       "min_torque": 400,
+       "torque_unit": "nm"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 8596
+   },
+   {
+    "case": "missing_unit",
+    "expectation": "asks for the unit instead of assuming one",
+    "passed": true,
+    "answer": "Could you please specify the unit for the torque (e.g., in-lbs, ft-lbs, N·m, or kgf·m)? \n\nAlso, to help me find the best match, do you have any other requirements such as supply voltage, service type (on/off or modulating), or enclosure type?",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 3891
+   },
+   {
+    "case": "converted_unit",
+    "expectation": "passes ft-lb to the tool and gets 761B00-11300000/A",
+    "passed": true,
+    "answer": "Here are the Series 76 actuators that meet your requirements for **70 ft-lb, On/Off, weatherproof, 110 V**:\n\n* **761B00-11300000/A** (Alias: 1B) — 73.3 ft-lb\n* **762A00-11300000/A** (Alias: 2A) — 110.8 ft-lb\n* **762B00-11300000/A** (Alias: 2B) — 145.8 ft-lb\n* **763A00-11300000/A** (Alias: 3A) — 220.8 ft-lb\n* **763B00-11300000/A** (Alias: 3B) — 366.7 ft-lb\n\nAll five models qualify for On/Off service at both 50 Hz and 60 Hz frequencies. Let me know if you need operating speed, current draw, or duty cycle details for a specific model.",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 70,
+       "torque_unit": "ft_lbs",
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [
+     "73.3",
+     "110.8",
+     "145.8",
+     "220.8",
+     "366.7"
+    ],
+    "latency_ms": 11672
+   },
+   {
+    "case": "off_topic",
+    "expectation": "redirects without calling tools",
+    "passed": true,
+    "answer": "I can only help with questions related to Series 76 actuators.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 2464
+   },
+   {
+    "case": "follow_up_without_context",
+    "expectation": "asks which model",
+    "passed": true,
+    "answer": "To answer that accurately, I'll need the specific part number of the Series 76 actuator you are referring to. Could you please provide the model identifier?",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 8448
+   }
+  ]
+ },
+ {
+  "model": "anthropic/claude-haiku-5.5",
+  "passed": 14,
+  "total": 14,
+  "unverified_numbers": 0,
+  "cost_usd": 0.0078,
+  "seconds": 72,
+  "median_seconds": 4.3,
+  "cases": [
+   {
+    "case": "lookup",
+    "expectation": "looks up the model and states 150 Nm",
+    "passed": true,
+    "answer": "The output torque of 762A00-11300000/A depends on the service:\n\n- **On/Off:** 1330 in-lbs (150 Nm)\n- **Modulating:** 1150 in-lbs (130 Nm)\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 5479
+   },
+   {
+    "case": "follow_up",
+    "expectation": "looks the model up again and states 40 W",
+    "passed": true,
+    "answer": "El 762A00-11300000/A tiene un motor de **40 W**.\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "service": "on_off"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 5272
+   },
+   {
+    "case": "follow_up_alias",
+    "expectation": "resolves the 2A at 110 V and states 2.3 A",
+    "passed": true,
+    "answer": "At 60 Hz, the 2A at 110 V (762A00-11300000/A) has a full load current (FLA) of **2.3 A**.\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 8317
+   },
+   {
+    "case": "ambiguous_alias",
+    "expectation": "shows the 3 options or asks which one",
+    "passed": true,
+    "answer": "The alias 1A matches three Series 76 models:\n\n1. **761A00-11300000/A**: 110 V, single-phase AC, weatherproof. Available as On/Off or Modulating.\n2. **761A00-11320000/A**: 220 V, single-phase AC, weatherproof. Available as On/Off or Modulating.\n3. **761A00-11330C00/A**: 220 V, three-phase AC, weatherproof. The table gives no values for this model.\n\nWhich voltage and service do you need? If you're unsure, tell me the supply voltage and whether you need On/Off or Modulating control, and I'll pull the full specifications.",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "1A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 2873
+   },
+   {
+    "case": "mistyped",
+    "expectation": "says it does not exist and suggests 761B00-11300000/A",
+    "passed": true,
+    "answer": "761800-11300000/A is not in the Series 76 tables. Did you mean one of these?\n\n- **761B00-11300000/A** (alias 1B): weatherproof, 110 V, 1-phase, AC, On/Off or Modulating\n- **761A00-11300000/A** (alias 1A): weatherproof, 110 V, 1-phase, AC, On/Off or Modulating\n- **765B00-11300000/A** (alias 5B): weatherproof, 110 V, 1-phase, AC, On/Off or Modulating\n\nWhich one should I look up?\n\n[Part numbers consulted: 761800-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761800-11300000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 3110
+   },
+   {
+    "case": "summary_example",
+    "expectation": "says it is not in the tables",
+    "passed": true,
+    "answer": "The part number 761A00-11380000/A is not in the Series 76 tables, so I can't give you its data.\n\nDid you mean one of these?\n- **761A00-11320000/A** (alias 1A): weatherproof, 220 V, 1-phase AC, On/Off or Modulating\n- **761A00-11300000/A** (alias 1A): weatherproof, 110 V, 1-phase AC, On/Off or Modulating\n- **767A00-11320000/A** (alias 7A): weatherproof, 220 V, 1-phase AC, On/Off or Modulating\n\nCould you confirm which one you need, or check the part number on the nameplate?\n\n[Part numbers consulted: 761A00-11380000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11380000/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 3248
+   },
+   {
+    "case": "na_model",
+    "expectation": "says the table lists it as N/A",
+    "passed": true,
+    "answer": "The table gives no values for 761A00-11330C00/A. It exists, but its datasheet entry is N/A, so I can't give its torque.\n\nSimilar models with data are:\n- **761A00-11300000/A**: 110 V, single-phase, AC, weatherproof, On/Off and Modulating\n- **761A00-11320000/A**: 220 V, single-phase, AC, weatherproof, On/Off and Modulating\n- **763A00-11330C00/A**: 220 V, three-phase, AC, weatherproof. Its service type is unspecified, so the table does not say whether its values apply to On/Off or Modulating.\n\nWould you like the torque of one of these, or a search for a model that matches your requirements?\n\n[Part numbers consulted: 761A00-11330C00/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11330C00/A"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 3462
+   },
+   {
+    "case": "recommend",
+    "expectation": "recommends 763B00-11300000/A first",
+    "passed": true,
+    "answer": "Six Series 76 models meet the requirement. The closest fits, from the tightest:\n\n1. **763B00-11300000/A** (alias 3B): 500 Nm On/Off, 30% duty cycle, 16 cycles/hour, 26 s at 60 Hz (32 s at 50 Hz)\n2. **763C00-11300000/A** (alias 3C): 550 Nm On/Off, 30% duty cycle, 13 cycles/hour, 33 s at 60 Hz (39 s at 50 Hz)\n3. **764A00-11300000/A** (alias 4A): 750 Nm On/Off, 25% duty cycle, 12 cycles/hour, 30 s at 60 Hz (36 s at 50 Hz)\n4. **764B00-11300000/A** (alias 4B): 1100 Nm On/Off, 25% duty cycle, 10 cycles/hour, 36 s at 60 Hz (43 s at 50 Hz)\n5. **765A00-11300000/A** (alias 5A): 2000 Nm On/Off, 25% duty cycle, 4 cycles/hour, 88 s at 60 Hz (106 s at 50 Hz)\n\nAll five are single-phase AC, certified CSA, CE and UKCA, and meet the 500 Nm requirement under On/Off service at both 50 and 60 Hz. The search reported six matches but returned only five, so the sixth is not listed here.\n\nIf you need the smallest unit that meets 500 Nm, choose the 763B00-11300000/A. If you need more margin, the 763C00-11300000/A is next. Do you have a required cycle rate or operating speed?\n\n[Part numbers consulted: 763B00-11300000/A, 763C00-11300000/A, 764A00-11300000/A, 764B00-11300000/A, 765A00-11300000/A]",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110,
+       "min_torque": 500,
+       "torque_unit": "nm"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 8610
+   },
+   {
+    "case": "impossible",
+    "expectation": "says none qualifies and offers 763Y30",
+    "passed": true,
+    "answer": "No Series 76 explosionproof model is rated for 3-phase power at 400 Nm or more. The closest options are all single-phase:\n\n- **763Y30-11300000/A** (alias 3Y, 110 V, 1-phase): 450 Nm On/Off at 60 Hz. Its Modulating rating is 360 Nm, below your 400 Nm.\n- **763Y30-11320000/A** (alias 3Y, 220 V, 1-phase): same torque ratings as the 110 V version: 450 Nm On/Off, 360 Nm Modulating.\n- **764X30-11300000/A** (alias 4X, 110 V, 1-phase): 800 Nm On/Off and 640 Nm Modulating at 60 Hz. This is the highest-torque option, but it is still single-phase.\n\nEach of these differs from your request only in the number of phases. The 764X30 is the only one that meets 400 Nm in both services.\n\nDo you want one of these single-phase models, or should I search with different criteria? If you tell me your supply voltage and whether you need On/Off or Modulating, I can narrow the list.\n\n[Part numbers consulted: 763Y30-11300000/A, 763Y30-11320000/A, 764X30-11300000/A]",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "enclosure": "explosionproof",
+       "phases": 3,
+       "min_torque": 400,
+       "torque_unit": "nm"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 5122
+   },
+   {
+    "case": "three_phase",
+    "expectation": "offers 763B00-11330C00/A with the 3-phase warning",
+    "passed": true,
+    "answer": "Con 3 fases, 220 V, servicio modulating y al menos 400 Nm, hay 5 modelos que cumplen. Todos son de caja weatherproof (uso industrial general), con certificaciones CSA, CE y UKCA:\n\n| Modelo | Alias | Par | Ciclo de trabajo | Velocidad 60 Hz / 50 Hz (90°) |\n|---|---|---|---|---|\n| 763B00-11330C00/A | 3B | 500 Nm | 70 % | 26 s / 32 s |\n| 763C00-11330C00/A | 3C | 600 Nm | 70 % | 32 s / 39 s |\n| 764A00-11330C00/A | 4A | 800 Nm | 70 % | 29 s / 35 s |\n| 764B00-11330C00/A | 4B | 1200 Nm | 70 % | 36 s / 43 s |\n| 765A00-11330C00/A | 5A | 2000 Nm | 50 % | 88 s / 105 s |\n\nNota: la tabla no indica si estos valores aplican al servicio Modulating. Conviene confirmarlo con el fabricante antes de elegir.\n\nEl modelo más ajustado a sus 400 Nm es el 763B00-11330C00/A (500 Nm). Si necesita más par, el siguiente es el 763C00-11330C00/A (600 Nm). ¿Qué frecuencia de red utiliza, 50 o 60 Hz?\n\n[Part numbers consulted: 763B00-11330C00/A, 763C00-",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "service": "modulating",
+       "phases": 3,
+       "min_torque": 400,
+       "torque_unit": "nm"
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 6334
+   },
+   {
+    "case": "missing_unit",
+    "expectation": "asks for the unit instead of assuming one",
+    "passed": true,
+    "answer": "Which torque unit do you mean: Nm, in-lbs, ft-lbs, or kgf·m? Once you confirm, I'll search for matching Series 76 actuators. It would also help to know the supply voltage, phases, and service type (On/Off or Modulating), if you have them.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 1295
+   },
+   {
+    "case": "converted_unit",
+    "expectation": "passes ft-lb to the tool and gets 761B00-11300000/A",
+    "passed": true,
+    "answer": "Five weatherproof, On/Off, 110 V models meet 70 ft-lb. They are listed from the tightest fit:\n\n1. **761B00-11300000/A** (alias 1B): 880 in-lbs (100 N·m) On/Off. Speed 19 s at 60 Hz, 23 s at 50 Hz. Duty cycle 40%, 31 cycles/hour. FLA 1.3 A at 60 Hz.\n2. **762A00-11300000/A** (alias 2A): 1330 in-lbs (150 N·m) On/Off. Speed 18 s at 60 Hz, 21 s at 50 Hz. Duty cycle 50%, 42 cycles/hour. FLA 2.3 A at 60 Hz.\n3. **762B00-11300000/A** (alias 2B): 1750 in-lbs (200 N·m) On/Off. Speed 25 s at 60",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 70,
+       "torque_unit": "ft_lbs",
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 7098
+   },
+   {
+    "case": "off_topic",
+    "expectation": "redirects without calling tools",
+    "passed": true,
+    "answer": "The capital of France is Paris. I can only help with questions about Series 76 electric actuators, though. If you need a model, torque range, or electrical data, I can look that up for you.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 1231
+   },
+   {
+    "case": "follow_up_without_context",
+    "expectation": "asks which model",
+    "passed": true,
+    "answer": "Which actuator do you mean? Please give me the part number, such as 762A00-11300000/A, and the voltage and service type if you know them.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 3067
+   }
+  ]
+ },
+ {
+  "model": "openai/gpt-5-mini",
+  "passed": 12,
+  "total": 14,
+  "unverified_numbers": 0,
+  "cost_usd": 0.0355,
+  "seconds": 277,
+  "median_seconds": 17.7,
+  "cases": [
+   {
+    "case": "lookup",
+    "expectation": "looks up the model and states 150 Nm",
+    "passed": true,
+    "answer": "762A00-11300000/A — Output torque:\n- Modulating: 130 N·m (1150 in·lb)\n- On/Off: 150 N·m (1330 in·lb)\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 11689
+   },
+   {
+    "case": "follow_up",
+    "expectation": "looks the model up again and states 40 W",
+    "passed": true,
+    "answer": "El 762A00-11300000/A tiene potencia de motor 40 W.  \nDatos eléctricos relevantes: 110 V AC monofásica; FLA 2.3 A (60 Hz) — LRA 2.5 A. (50 Hz: FLA 2.3 A, LRA 2.4 A). [Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 28045
+   },
+   {
+    "case": "follow_up_alias",
+    "expectation": "resolves the 2A at 110 V and states 2.3 A",
+    "passed": true,
+    "answer": "762A00-11300000/A (2A) at 110 V, 60 Hz — Full load current (FLA): 2.3 A.\n\n[Part numbers consulted: 762A00-11300000/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "762A00-11300000/A",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 32759
+   },
+   {
+    "case": "ambiguous_alias",
+    "expectation": "shows the 3 options or asks which one",
+    "passed": true,
+    "answer": "Several Series 76 models use the alias \"1A\". Which do you mean?\n\n- 761A00-11300000/A — weatherproof, 110 V AC, 1‑phase; listed for both Modulating and On/Off (data available).  \n- 761A00-11320000/A — weatherproof, 220 V AC, 1‑phase; listed for both Modulating and On/Off (data available).  \n- 761A00-11330C00/A — weatherproof, 220 V AC, 3‑phase; table gives no values for this model.\n\nWhich part number or voltage/service do you want full specs for (torque, speed, currents, etc.)?",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "1A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 13106
+   },
+   {
+    "case": "mistyped",
+    "expectation": "says it does not exist and suggests 761B00-11300000/A",
+    "passed": true,
+    "answer": "Part number 761800-11300000/A is not in the Series 76 tables.\n\nDid you mean one of these suggestions?\n- 761B00-11300000/A (alias 1B) — weatherproof, 110 V AC, 1 phase, supports Modulating and On/Off.\n- 761A00-11300000/A (alias 1A) — weatherproof, 110 V AC, 1 phase, supports Modulating and On/Off.\n- 765B00-11300000/A (alias 5B) — weatherproof, 110 V AC, 1 phase, supports Modulating and On/Off.\n\nWhich of these (or a different exact part number or voltage/phase) should I look up the specs for?",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761800-11300000/A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 18249
+   },
+   {
+    "case": "summary_example",
+    "expectation": "says it is not in the tables",
+    "passed": true,
+    "answer": "That part number is not in the Series 76 tables.\n\nDid you mean one of these suggestions?\n- 761A00-11320000/A — weatherproof, 220 V, 1‑phase AC; services: Modulating and On/Off  \n- 761A00-11300000/A — weatherproof, 110 V, 1‑phase AC; services: Modulating and On/Off  \n- 767A00-11320000/A — weatherproof, 220 V, 1‑phase AC; services: Modulating and On/Off\n\nWhich of these (or another part number) should I fetch the full data for?",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11380000/A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 15954
+   },
+   {
+    "case": "na_model",
+    "expectation": "says the table lists it as N/A",
+    "passed": true,
+    "answer": "761A00-11330C00/A — The table gives no torque value for this model (listed as N/A: it exists, but the PDF gives no values for it).\n\nSuggested alternatives I can look up for torque (which would give values):\n- 761A00-11300000/A — 110 V AC, 1‑phase (modulating & on/off)\n- 761A00-11320000/A — 220 V AC, 1‑phase (modulating & on/off)\n- 763A00-11330C00/A — 220 V AC, 3‑phase (table lists service as “unspecified”)\n\nWhich part number (or which voltage/service) should I retrieve torque for?  \n[Part numbers consulted: 761A00-11330C00/A]",
+    "tools": [
+     {
+      "name": "get_actuator_specs",
+      "args": {
+       "identifier": "761A00-11330C00/A",
+       "voltage_v": null,
+       "phases": null,
+       "service": null
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 22319
+   },
+   {
+    "case": "recommend",
+    "expectation": "recommends 763B00-11300000/A first",
+    "passed": true,
+    "answer": "",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 500,
+       "torque_unit": "nm",
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110,
+       "current_type": "AC",
+       "phases": 1
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 43737
+   },
+   {
+    "case": "impossible",
+    "expectation": "says none qualifies and offers 763Y30",
+    "passed": false,
+    "answer": "No model meets every requirement (explosionproof + 3‑phase + ≥400 Nm).",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 400,
+       "torque_unit": "nm",
+       "enclosure": "explosionproof",
+       "phases": 3
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 17131
+   },
+   {
+    "case": "three_phase",
+    "expectation": "offers 763B00-11330C00/A with the 3-phase warning",
+    "passed": false,
+    "answer": "",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 400,
+       "torque_unit": "nm",
+       "service": "modulating",
+       "phases": 3
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 23395
+   },
+   {
+    "case": "missing_unit",
+    "expectation": "asks for the unit instead of assuming one",
+    "passed": true,
+    "answer": "What unit is \"500\" in? (nm, in_lbs, ft_lbs, or kgf_m)\n\nAlso, do you need On/Off or Modulating service? Any preference for supply voltage, enclosure (weatherproof or explosionproof), phases (1 or 3), or maximum 90° time?",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 8338
+   },
+   {
+    "case": "converted_unit",
+    "expectation": "passes ft-lb to the tool and gets 761B00-11300000/A",
+    "passed": true,
+    "answer": "",
+    "tools": [
+     {
+      "name": "recommend_actuators",
+      "args": {
+       "min_torque": 70,
+       "torque_unit": "ft_lbs",
+       "service": "on_off",
+       "enclosure": "weatherproof",
+       "voltage_v": 110
+      }
+     }
+    ],
+    "unverified_numbers": [],
+    "latency_ms": 21522
+   },
+   {
+    "case": "off_topic",
+    "expectation": "redirects without calling tools",
+    "passed": true,
+    "answer": "I can only help with Series 76 electric actuators (part numbers, specs, selection). I can't answer general-knowledge questions like that. If you need actuator data or help choosing a model, tell me the part number or your requirements.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 4110
+   },
+   {
+    "case": "follow_up_without_context",
+    "expectation": "asks which model",
+    "passed": true,
+    "answer": "Which model do you mean? Please give the exact full Series 76 part number (for example: 762A00-11300000/A). Also tell me which power figure you want: motor power (W), full‑load current (FLA, A) or locked‑rotor current (LRA, A). \n\nIf you only have an alias or partial number, include the supply voltage and service (On/Off or Modulating) or number of phases so I can pick the correct entry.",
+    "tools": [],
+    "unverified_numbers": [],
+    "latency_ms": 9805
+   }
+  ]
+ }
+]

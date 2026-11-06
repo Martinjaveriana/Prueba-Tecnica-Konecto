@@ -87,8 +87,8 @@ CASES = [
          lambda r: first_product(r, "match") == "761B00-11300000/A",
          "passes ft-lb to the tool and gets 761B00-11300000/A"),
     Case("off_topic", ["What is the capital of France?"],
-         lambda r: not r.debug["tool_calls"],
-         "redirects without calling tools"),
+         lambda r: not r.debug["tool_calls"] and "Paris" not in r.answer,
+         "redirects without calling tools or answering"),
     Case("follow_up_without_context", ["And how much power does it draw?"],
          lambda r: not r.products,
          "asks which model"),
@@ -119,7 +119,10 @@ def run_case(case: Case) -> dict:
     return {
         "case": case.name,
         "expectation": case.expectation,
-        "passed": case.check(result),
+        # An empty or cut answer fails whatever the tools returned: the user would see nothing useful.
+        "passed": case.check(result) and not result.debug["empty_answer"] and result.debug["finish_reason"] != "length",
+        "finish_reason": result.debug["finish_reason"],
+        "marker_removed": result.debug["marker_removed"],
         "answer": result.answer,
         "tools": [{"name": c["name"], "args": c["args"]} for c in result.debug["tool_calls"]],
         "unverified_numbers": result.debug["unverified_numbers"],
@@ -146,6 +149,8 @@ def evaluate(model: str) -> dict:
         "passed": sum(c["passed"] for c in cases),
         "total": len(cases),
         "unverified_numbers": sum(len(c.get("unverified_numbers", [])) for c in cases),
+        "answers_cut": sum(c.get("finish_reason") == "length" for c in cases),
+        "markers_removed": sum(bool(c.get("marker_removed")) for c in cases),
         "cost_usd": round(openrouter_usage() - spent_before, 5),
         "seconds": round(time.monotonic() - started),
         # Per question, as the app would wait for it. Questions with two turns add both; failed ones are left out.
@@ -162,6 +167,7 @@ def main() -> int:
         print("Set OPENROUTER_API_KEY in .env to compare models.")
         return 2
 
+    print(f"LLM_MAX_TOKENS={settings.llm_max_tokens}, LLM_TEMPERATURE={settings.llm_temperature}")
     results = []
     for model in args.models:
         print(f"\n{model}")
@@ -169,11 +175,11 @@ def main() -> int:
 
     RESULTS_PATH.parent.mkdir(exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n{'model':40} passed  unverified  cost USD  median s  total s")
+    print(f"\n{'model':32} passed  unverified  cut  markers  cost USD  median s  total s")
     for r in results:
         print(
-            f"{r['model']:40} {r['passed']:>2}/{r['total']}  {r['unverified_numbers']:>10}  {r['cost_usd']:>8}"
-            f"  {r['median_seconds']:>8}  {r['seconds']:>7}"
+            f"{r['model']:32} {r['passed']:>2}/{r['total']}  {r['unverified_numbers']:>10}  {r['answers_cut']:>3}"
+            f"  {r['markers_removed']:>7}  {r['cost_usd']:>8}  {r['median_seconds']:>8}  {r['seconds']:>7}"
         )
     print(f"\nDetails -> {RESULTS_PATH}")
     return 0

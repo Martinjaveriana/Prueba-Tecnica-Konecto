@@ -312,7 +312,37 @@ Usuario: ¿y cuánta potencia consume?
 
 **Problemas que encontró una revisión externa, ya corregidos y con test:** un argumento corregido en el mismo turno seguía marcando `needs_clarification`; el verificador marcaba los 90 grados del giro; y una pregunta de solo espacios llegaba al LLM. También faltaba un test del seguimiento cuando el turno anterior mostró varios modelos, que funcionaba bien.
 
-**El modelo:** `openai/gpt-5-mini` es provisional. Se elegirá con `eval_agent.py`, que corre 14 preguntas con 3 candidatos. Cada una se califica con código a partir de lo que devolvieron las tools, y el script mide lo que realmente se gastó.
+### Elección del modelo
+
+**Elegido: `anthropic/claude-haiku-5.5`.** Se comparó con otros dos candidatos de distintos precios usando `eval_agent.py`, que hace las mismas 14 preguntas a cada modelo. Cada pregunta se califica con código a partir de lo que devolvieron las tools, no leyendo la respuesta.
+
+**Resultado de la corrida final** (`LLM_MAX_TOKENS=3000`):
+
+| Modelo | Aprobadas | Números que no salen de las tools | Tiempo típico por pregunta | Costo por pregunta |
+|---|---|---|---|---|
+| **`anthropic/claude-haiku-5.5`** | **14/14** | **0** | **3.2 s** | **USD 0.0007** |
+| `openai/gpt-5-mini` | 14/14 | 0 | 13.0 s | USD 0.0022 |
+| `qwen/qwen3.7-flash` | 13/14 | 0 | 7.6 s | USD 0.0001 |
+
+| Decisión | Por qué | Descartado |
+|---|---|---|
+| Claude Haiku 5.5 | Aprobó todo en las dos corridas, fue el más rápido y con USD 10 alcanza para más de 10 000 preguntas | GPT-5 mini: igual de preciso en la corrida final, pero 4 veces más lento y 3 veces más caro, y la app es un chat móvil. Qwen: el más barato, pero en un seguimiento buscó por el alias "2A" en vez del part number exacto, y en la primera corrida convirtió unidades por su cuenta |
+| Criterios definidos antes de correr | Evita elegir el ganador y después justificarlo | Decidir mirando las respuestas |
+| `LLM_MAX_TOKENS=3000` | GPT-5 mini y Qwen razonan antes de responder y gastan tokens en eso. Con 1000, algunas respuestas salían vacías | Mantener 1000 |
+
+**Qué enseñó la primera corrida** (con 1000 tokens), corregido antes de la final:
+
+| Problema | Ejemplo | Arreglo |
+|---|---|---|
+| Respuestas vacías o cortadas | Qwen gastó 928 de 1000 tokens razonando | Límite de 3000, y `debug.finish_reason` indica si una respuesta se cortó |
+| El marcador interno aparecía en las respuestas | Los 3 modelos copiaban `[Part numbers consulted: …]`; Haiku en 9 de 14 | El código lo quita, y `debug.marker_removed` lo registra |
+| Respuestas fuera de tema | Haiku respondió "Paris" antes de redirigir | Las instrucciones le dicen que no responda |
+| Mi script aprobaba respuestas vacías | Revisaba los productos, no el texto | Una respuesta vacía o cortada ahora reprueba |
+| Conversión de unidades por su cuenta | Qwen escribió 73.3 ft-lb, que no está en la tabla | Ninguno: el verificador lo marcó, que es justo para lo que existe |
+
+**Límites:** son 14 preguntas, una corrida por modelo. Alcanza para elegir entre tres candidatos, no es un estudio estadístico. Las dos corridas costaron USD 0.11 en total y están en `backend/eval/`.
+
+**Un detalle de transparencia:** el asistente con el que se construyó el proyecto también es un modelo de Anthropic. Por eso los criterios se fijaron antes de correr la comparación, y cada pregunta se califica con código.
 
 ### Proyecto
 

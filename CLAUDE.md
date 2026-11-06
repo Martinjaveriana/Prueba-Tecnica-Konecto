@@ -178,7 +178,8 @@ Trampas que el código debe respetar:
 - **Tablas de 3 fases, búsquedas:** las filas `unspecified` aparecen al filtrar por On/Off o Modulating, con un aviso visible: "Encontré `763B00-11330C00/A`, de 500 Nm. Ojo: la tabla no indica si ese valor aplica a Modulating."
 
 ## Fase 3: agente y API (diseño aprobado)
-- Agente con `create_agent` de LangChain, las 3 tools y OpenRouter mediante `langchain-openai`. Modelo configurable por `.env`; se elige comparando 3 candidatos con preguntas de prueba.
+- Agente con `create_agent` de LangChain, las 3 tools y OpenRouter mediante `langchain-openai`. Modelo configurable por `.env`; por defecto `anthropic/claude-haiku-5.5`, elegido con `eval_agent.py`. `LLM_MAX_TOKENS=3000`, porque los modelos que razonan dejaban respuestas vacías con 1000.
+- El código quita de la respuesta el marcador `[Part numbers consulted]`, porque los modelos lo copiaban.
 - Endpoints: `POST /api/conversation`, `GET /api/sessions`, `GET /api/sessions/{id}/messages`, `GET /health`.
 - Historial en tablas `sessions` y `messages`. Al LLM solo se le envía el texto de cada turno y, escrita por el código, la lista de part numbers consultados: `[Modelos consultados: 762A00-11300000/A]`. En los seguimientos vuelve a consultar la tool; nunca reutiliza números de turnos anteriores.
 - `products` y `needs_clarification` los decide el código a partir de lo que devolvieron las tools, no el LLM.
@@ -194,7 +195,7 @@ URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat
 1. **Fase 0, hecha:** estructura del repo, Postgres en Docker, test de conexión.
 2. **Fase 1, hecha:** `ingest.py`, validación, tests y esquema. Repetir `--extract` da archivos idénticos. La auditoría con `gemini-3.5-flash` comparó 869 celdas y encontró una diferencia, en la que el PDF confirma nuestro dato.
 3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
-4. **Fase 3, casi hecha:** agente, API, persistencia, verificador de números y Dockerfile, probados con un LLM falso. Falta elegir el modelo con `eval_agent.py`, que necesita la clave de OpenRouter.
+4. **Fase 3, hecha:** agente, API, persistencia, verificador de números y Dockerfile. Modelo elegido: `anthropic/claude-haiku-5.5` (14/14, 3.2 s, USD 0.0007 por pregunta), comparado con GPT-5 mini y Qwen 3.7 Flash. Detalle en `docs/decisiones-de-diseno.md`.
 5. **Fase 4:** app Android.
 6. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.
 

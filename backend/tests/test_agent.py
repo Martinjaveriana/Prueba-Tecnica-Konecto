@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from app.agent import CONSULTED_PREFIX, history_messages, products_from, run_turn
+from app.agent import CONSULTED_PREFIX, EMPTY_ANSWER, history_messages, products_from, run_turn
 from app.numbers import unverified_numbers
 from ingest import PROCESSED_PATH
 from ingestion.load import load
@@ -113,6 +113,24 @@ def test_a_clarification_still_pending_at_the_end_is_reported():
         say("Here are some options. Which 1A do you mean?"),
     )
     assert run_turn("500 Nm at 110 V, and what about the 1A?", [], model).needs_clarification is True
+
+
+def test_the_internal_marker_never_reaches_the_user():
+    model = scripted(
+        call("get_actuator_specs", identifier="762A00-11300000/A"),
+        say("It draws 40 W.\n\n[Part numbers consulted: 762A00-11300000/A]"),
+    )
+    result = run_turn("Power of 762A00-11300000/A?", [], model)
+    assert result.answer == "It draws 40 W."
+    assert result.debug["marker_removed"] is True
+
+
+def test_an_empty_answer_is_replaced_and_reported():
+    model = scripted(call("get_actuator_specs", identifier="762A00-11300000/A"), say(""))
+    result = run_turn("Power of 762A00-11300000/A?", [], model)
+    assert result.answer == EMPTY_ANSWER
+    assert result.debug["empty_answer"] is True
+    assert result.products[0]["part_number"] == "762A00-11300000/A"
 
 
 def test_an_answer_with_no_tool_has_no_products():

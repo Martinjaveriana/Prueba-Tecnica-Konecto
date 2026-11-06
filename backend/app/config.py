@@ -17,9 +17,10 @@ class Settings(BaseSettings):
 
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "openai/gpt-5-mini"
+    llm_model: str = "anthropic/claude-haiku-5.5"
     llm_temperature: float | None = 0
-    llm_max_tokens: int = 1000
+    # Reasoning models spend part of this before answering: with 1000, some answers came out empty.
+    llm_max_tokens: int = 3000
     llm_timeout_sec: float = 60
     # Upper bound on model and tool steps in one turn, so a confused model cannot loop and spend budget.
     agent_max_steps: int = 12

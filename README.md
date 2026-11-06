@@ -8,7 +8,7 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 |---|---|
 | Data ingestion from the PDF | Done |
 | Agent tools, tested without an LLM | Done |
-| Agent, REST API and conversation history | Done. The default model is provisional until the comparison below runs |
+| Agent, REST API and conversation history | Done |
 | Backend `Dockerfile` | Done |
 | Android app | Not built yet |
 
@@ -127,19 +127,35 @@ The response of `POST /api/conversation`:
 
 ## Language model
 
-The model is set with `LLM_MODEL` in `.env`, and any OpenRouter model that supports tool calling works. `openai/gpt-5-mini` is the provisional default. The final choice will come from running the same 14 checks on three candidates. The checks are decided by code from the tool results, and the script reports the measured cost:
+The default is `anthropic/claude-haiku-5.5`. It is set with `LLM_MODEL` in `.env`, and any OpenRouter model that supports tool calling works.
+
+### How it was chosen
+
+Three candidates, picked across the price range, answered the same 14 questions. Each question is checked by code from the tool results, not by reading the answer. For example, a follow-up must look up the exact part number from the earlier turn, a torque without a unit must not be searched, and an off-topic question must not be answered. The script also reports cut answers, numbers missing from the tool results, latency and the cost measured on the OpenRouter key.
+
+From `backend/`:
 
 ```bash
-uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
+uv run python eval_agent.py qwen/qwen3.7-flash anthropic/claude-haiku-5.5 openai/gpt-5-mini
 ```
 
-Estimated cost per question, from OpenRouter prices on November 6, 2026, assuming about 10,000 input and 600 output tokens:
+Results of the final run, with `LLM_MAX_TOKENS=3000`:
 
-| Model | Per question | Questions with USD 10 |
-|---|---|---|
-| `qwen/qwen3.7-flash` | about USD 0.0004 | about 26,000 |
-| `anthropic/claude-haiku-5.5` | about USD 0.0013 | about 7,700 |
-| `openai/gpt-5-mini` | about USD 0.0037 | about 2,700 |
+| Model | Passed | Numbers not from the tools | Median time per question | Cost per question |
+|---|---|---|---|---|
+| **`anthropic/claude-haiku-5.5`** | **14/14** | **0** | **3.2 s** | **USD 0.0007** |
+| `openai/gpt-5-mini` | 14/14 | 0 | 13.0 s | USD 0.0022 |
+| `qwen/qwen3.7-flash` | 13/14 | 0 | 7.6 s | USD 0.0001 |
+
+Claude Haiku 5.5 passed every check in both runs, was the fastest, and costs about USD 0.0007 per question, so the USD 10 budget covers more than 10,000 questions. GPT-5 mini was just as accurate in this run, but four times slower and three times more expensive, which matters in a mobile chat. Qwen was the cheapest, but in a follow-up it searched by the short alias instead of the exact part number, and in the first run it converted units by itself.
+
+The first run, with a limit of 1000 tokens, exposed three problems that were fixed before the final run:
+
+- **Cut answers:** GPT-5 mini and Qwen reason before answering, and with 1000 tokens some answers came out empty. The limit is now 3000, and a cut answer shows in `debug.finish_reason`.
+- **An internal marker in the answers:** all three models copied the `[Part numbers consulted]` line into their answers, Haiku in 9 of 14. Code now removes it, and `debug.marker_removed` records when it did.
+- **Off-topic answers:** Haiku answered "Paris" before redirecting. The instructions now tell the model not to answer.
+
+Both runs are saved in `backend/eval/`, and together they spent USD 0.11 of the key. These are 14 questions run once per model: enough to choose among three candidates, not a statistical study.
 
 ## Data ingestion
 
@@ -270,7 +286,7 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `backend/ingestion/` | Its stages: structure, extract, build, load, audit |
 | `backend/data/` | Raw, corrected, processed and audit data |
 | `backend/app/` | API (`api.py`), agent (`agent.py`), number check (`numbers.py`), conversations, queries (`catalog.py`), tools and schema |
-| `backend/eval_agent.py` | Compares language models on the same questions |
+| `backend/eval_agent.py`, `backend/eval/` | Compares language models on the same questions, and the saved results |
 | `backend/Dockerfile` | The backend image, without the OCR dependencies |
 | `backend/tests/` | Tests |
 | `docs/` | The assessment, source PDFs and project guides |

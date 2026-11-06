@@ -5,6 +5,7 @@ list, decides whether the user must clarify something and checks the numbers in 
 """
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 
@@ -43,8 +44,10 @@ How to answer
   this value applies to Modulating."
 - Repeat any note a tool includes, such as sizes 6 and 7 not being CSA certified.
 - A follow-up with no model mentioned earlier: ask for the part number.
-- Questions unrelated to Series 76 actuators: say politely that you can only help with them.
-- Never mention tools, functions, JSON or other internal details.
+- Questions unrelated to Series 76 actuators: do not answer them; say politely that you can only help with
+  Series 76 actuators.
+- Never mention tools, functions, JSON or other internal details, and never write a "[Part numbers consulted]"
+  line: the system adds it.
 
 Context
 - Weatherproof enclosures are for general industrial use. Explosionproof enclosures are for hazardous areas
@@ -55,6 +58,9 @@ Context
   turn. FLA: current at maximum rated load. LRA: current at startup, with the rotor locked."""
 
 CONSULTED_PREFIX = "[Part numbers consulted: "
+# Models imitate the marker they see in earlier answers. It is internal, so code removes it.
+CONSULTED_LINE = re.compile(r"\s*\[Part numbers consulted:[^\]]*\]")
+EMPTY_ANSWER = "I could not finish the answer. Please ask again."
 MAX_CONSULTED = 8
 CLARIFICATION_STATUSES = {"ambiguous", "not_found", "needs_requirements", "invalid"}
 
@@ -147,7 +153,8 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         for call in m.tool_calls
     ]
     final = next((m for m in reversed(new_messages) if isinstance(m, AIMessage) and not m.tool_calls), None)
-    answer = _text(final).strip() if final else ""
+    raw_answer = _text(final).strip() if final else ""
+    answer = CONSULTED_LINE.sub("", raw_answer).strip() or EMPTY_ANSWER
 
     products: list[dict] = []
     for call in tool_calls:
@@ -167,6 +174,10 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
     debug = {
         "model": settings.llm_model,
         "tool_calls": tool_calls,
+        # "length" means the answer was cut by LLM_MAX_TOKENS, which reasoning models spend quickly.
+        "finish_reason": final.response_metadata.get("finish_reason") if final else None,
+        "empty_answer": answer == EMPTY_ANSWER,
+        "marker_removed": CONSULTED_PREFIX in raw_answer,
         "unverified_numbers": unverified_numbers(
             answer, [call["output"] for call in tool_calls] + [query, SYSTEM_PROMPT]
         ),
