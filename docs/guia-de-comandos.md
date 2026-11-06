@@ -211,6 +211,57 @@ Después de la última prueba, vuelve a levantar la base con `docker compose sta
 docker compose logs -f backend
 ```
 
+## Android Studio
+
+### Instalación (ya hecha en esta máquina)
+
+Se instaló sin `sudo`, con el `.tar.gz` oficial de <https://developer.android.com/studio> (versión 2026.2.2, 1.5 GB). Antes de descomprimirlo se comparó su SHA-256 con el publicado en esa página. Quedó en `~/android-studio`, y aparece en el menú de aplicaciones como "Android Studio".
+
+Para abrirlo desde la terminal:
+
+```bash
+~/android-studio/bin/studio &
+```
+
+La primera vez, el asistente pide el tipo de instalación: elige **Standard**. Descarga el SDK en `~/Android/Sdk` y pide aceptar las licencias del SDK, algo que hace cada desarrollador por su cuenta.
+
+### Por qué así
+
+- **El `.tar.gz` y no snap:** `snap install` necesita `sudo` y actualiza Android Studio por su cuenta. El `.tar.gz` se instala en la carpeta personal y la versión no cambia a mitad de la prueba.
+- **El emulador va rápido:** el procesador tiene virtualización y el usuario puede usar `/dev/kvm`. Para comprobarlo:
+
+```bash
+test -r /dev/kvm -a -w /dev/kvm && echo "KVM disponible"
+```
+
+### El emulador
+
+El asistente creó el emulador `Medium_Phone_API_37.0`: Android 17 (API 37), x86_64, con Google Play. Para ver los emuladores que hay:
+
+```bash
+~/Android/Sdk/emulator/emulator -list-avds
+```
+
+Para arrancarlo sin Android Studio:
+
+```bash
+~/Android/Sdk/emulator/emulator -avd Medium_Phone_API_37.0 -no-snapshot-save &
+```
+
+Para saber si ya terminó de arrancar (responde `1` cuando está listo):
+
+```bash
+~/Android/Sdk/platform-tools/adb shell getprop sys.boot_completed
+```
+
+### Comprobar que el emulador llega al backend
+
+Dentro del emulador, `localhost` es el propio emulador, no tu computador. Tu computador se ve como `10.0.2.2`, por eso la app usará `http://10.0.2.2:8000`. Con el backend arriba, esto debe imprimir el JSON de `/health`:
+
+```bash
+~/Android/Sdk/platform-tools/adb shell '(printf "GET /health HTTP/1.0\r\n\r\n"; sleep 3) | nc 10.0.2.2 8000'
+```
+
 ## Base de datos
 
 Estos comandos van desde la raíz del repo.
