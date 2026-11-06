@@ -48,11 +48,23 @@ cd backend && uv run --group extract python ingest.py --audit
 ```
 En orden: cargar el JSON revisado en Postgres, reconstruirlo desde las tablas crudas, volver a leer el PDF con Docling y auditar con Google AI Studio. Docling y el SDK de Google están en el grupo opcional `extract`, que no va en la imagen Docker.
 
-No hay linter configurado todavía.
+Backend completo con Docker (crea las tablas y carga los datos al arrancar; API en `http://localhost:8000/docs`):
+```bash
+docker compose up -d --build --wait
+```
+
+API sin Docker, y comparación de modelos (gasta de la clave de OpenRouter):
+```bash
+cd backend && uv run uvicorn app.api:app --reload
+cd backend && uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
+```
+
+Los tests usan un LLM falso (`tests/fake_llm.py`) y no gastan presupuesto. No hay linter configurado todavía.
 
 ## Estructura
 - `backend/`: Python 3.12 gestionado con `uv`. La configuración está en `app/config.py` y lee el `.env` de la raíz.
 - `backend/ingestion/`: la ingesta en etapas. `spec.py` declara la estructura de las 7 tablas, `extract.py` lee con Docling, `build.py` limpia y valida, `load.py` carga y `audit.py` compara con el modelo de visión.
+- `backend/app/api.py` (endpoints), `agent.py` (instrucciones, historial, `products`, debug), `numbers.py` (verificador de números), `conversations.py` (persistencia). El LLM solo elige tools y redacta: lo demás lo decide el código.
 - `backend/app/catalog.py`: las consultas y las reglas de búsqueda, sin LLM. `backend/app/tools.py` las expone como tools de LangChain; la lógica va en `catalog.py`.
 - `backend/data/`: `raw/` (lo que leyó Docling), `corrections.json` (correcciones registradas), `processed/actuators.json` (la fuente de la carga). Un valor mal leído se resuelve en `corrections.json`, nunca editando `processed/`.
 - `android/`: app en Kotlin + Jetpack Compose (aún no existe).
@@ -165,25 +177,15 @@ Trampas que el código debe respetar:
 - **Alias:** columna con el nombre corto (`761A00-11300000/A` → `1A`), calculada por código a partir del part number. No es única: `1A` corresponde a 3 modelos y `1X` a 4, así que buscar por alias puede devolver varios y el agente debe mostrarlos o preguntar.
 - **Tablas de 3 fases, búsquedas:** las filas `unspecified` aparecen al filtrar por On/Off o Modulating, con un aviso visible: "Encontré `763B00-11330C00/A`, de 500 Nm. Ojo: la tabla no indica si ese valor aplica a Modulating."
 
-## Diseño previsto (sin implementar)
-
-### Respuesta de la API
-```json
-{
-  "session_id": "...",
-  "answer": "texto breve del agente",
-  "products": [ { "base_part_number": "...", "specs": { ... } } ],
-  "clarification_needed": false,
-  "debug": { "tool_calls": [ { "name": "...", "args": { ... }, "output": { ... } } ] }
-}
-```
-`products` se llena **desde la salida de las tools**, no desde el texto del LLM, para que la app muestre números garantizados. `debug` alimenta la pantalla de debug.
-
-### Conversaciones
-Tablas `sessions` y `messages` en PostgreSQL. En cada turno se carga el historial al agente. El título sale de la primera pregunta, sin gastar LLM.
-
-### Modelos y presupuesto (USD 10)
-Modelo barato y bueno en tool calling, configurable por `.env`, elegido con los precios de ese momento y justificado en el README. `max_tokens` acotado, historial recortado y pocas pruebas end-to-end con la clave real.
+## Fase 3: agente y API (diseño aprobado)
+- Agente con `create_agent` de LangChain, las 3 tools y OpenRouter mediante `langchain-openai`. Modelo configurable por `.env`; se elige comparando 3 candidatos con preguntas de prueba.
+- Endpoints: `POST /api/conversation`, `GET /api/sessions`, `GET /api/sessions/{id}/messages`, `GET /health`.
+- Historial en tablas `sessions` y `messages`. Al LLM solo se le envía el texto de cada turno y, escrita por el código, la lista de part numbers consultados: `[Modelos consultados: 762A00-11300000/A]`. En los seguimientos vuelve a consultar la tool; nunca reutiliza números de turnos anteriores.
+- `products` y `needs_clarification` los decide el código a partir de lo que devolvieron las tools, no el LLM.
+- Un verificador revisa que cada número de la respuesta aparezca en lo que devolvieron las tools en ese turno; si no, lo marca en `debug`.
+- `debug` siempre va en la respuesta; la app lo oculta.
+- El backend crea las tablas y carga los datos al arrancar. Un turno se guarda completo o no se guarda.
+- Los tests usan un LLM falso; la clave real solo para la comparación de modelos y unas pocas pruebas finales.
 
 ### App
 URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat con tarjetas o tabla comparativa a partir de `products`. Debug oculta, abierta con un gesto documentado en el README.
@@ -192,7 +194,7 @@ URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat
 1. **Fase 0, hecha:** estructura del repo, Postgres en Docker, test de conexión.
 2. **Fase 1, hecha:** `ingest.py`, validación, tests y esquema. Repetir `--extract` da archivos idénticos. La auditoría con `gemini-3.5-flash` comparó 869 celdas y encontró una diferencia, en la que el PDF confirma nuestro dato.
 3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
-4. **Fase 3:** agente, FastAPI, persistencia de sesiones, Dockerfile.
+4. **Fase 3, casi hecha:** agente, API, persistencia, verificador de números y Dockerfile, probados con un LLM falso. Falta elegir el modelo con `eval_agent.py`, que necesita la clave de OpenRouter.
 5. **Fase 4:** app Android.
 6. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.
 

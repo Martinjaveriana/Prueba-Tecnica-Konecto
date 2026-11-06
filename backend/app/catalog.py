@@ -229,8 +229,28 @@ def find_actuator(
         }
 
     actuator = narrowed[0]
-    status = "found" if actuator["has_data"] else "no_data"
-    return {"status": status, "actuator": _record(actuator)}
+    if actuator["has_data"]:
+        return {"status": "found", "actuator": _record(actuator)}
+    return {
+        "status": "no_data",
+        "actuator": _record(actuator),
+        "alternatives": [_summary(a) for a in _alternatives_to_no_data(actuator, actuators)],
+    }
+
+
+def _alternatives_to_no_data(actuator: dict, actuators: list[dict]) -> list[dict]:
+    """Same model with another supply, then the smallest model with data on the same supply.
+
+    They are offered as options to look at, not as equivalents: the PDF does not say why the
+    model has no data.
+    """
+    with_data = [a for a in actuators if a["has_data"]]
+    same_alias = [a for a in with_data if a["alias"] == actuator["alias"]]
+    same_supply = [
+        a for a in with_data
+        if all(a[key] == actuator[key] for key in ("enclosure", "voltage_v", "phases", "current_type"))
+    ]
+    return same_alias + sorted(same_supply, key=lambda a: a["alias"])[:1]
 
 
 def _required_torque(req: Requirements) -> tuple[str, Decimal]:

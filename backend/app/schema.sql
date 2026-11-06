@@ -39,3 +39,25 @@ CREATE TABLE IF NOT EXISTS electrical_ratings (
     lra_a NUMERIC(4, 1) NOT NULL,
     UNIQUE NULLS NOT DISTINCT (part_number, frequency_hz)
 );
+
+-- Conversations. A turn is saved as one user message and one assistant message, together.
+CREATE TABLE IF NOT EXISTS sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    session_id UUID NOT NULL REFERENCES sessions ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    -- Assistant messages only: what the tools returned in that turn, and how it was produced.
+    products JSONB NOT NULL DEFAULT '[]',
+    needs_clarification BOOLEAN NOT NULL DEFAULT false,
+    debug JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS messages_session_idx ON messages (session_id, id);

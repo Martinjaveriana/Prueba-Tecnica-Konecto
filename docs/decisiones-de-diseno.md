@@ -220,7 +220,7 @@ La lógica está en `backend/app/catalog.py` y se prueba sin LLM. `backend/app/t
 |---|---|---|
 | `761a00-11300000/a` | `found` | Los datos del modelo |
 | `1A` o `761A00` | `ambiguous` | 3 opciones, para mostrarlas o preguntar |
-| `761A00-11330C00/A` | `no_data` | El modelo existe, pero la tabla dice N/A |
+| `761A00-11330C00/A` | `no_data` | El modelo existe, pero la tabla dice N/A. Sugiere el mismo modelo con otra alimentación (`761A00-11300000/A`, `761A00-11320000/A`) y el menor de 3 fases con datos (`763A00-11330C00/A`) |
 | `761800-11300000/A` | `not_found` | Sugiere `761B00-11300000/A`, sin cambiarlo solo |
 | Nada | `invalid` | Que no se dio ningún número |
 
@@ -263,6 +263,53 @@ Texto del aviso de 3 fases: "Encontré `763B00-11330C00/A`, de 500 Nm. Ojo: la t
 | `voltage_v=24 current_type=AC service=modulating` | Sugería modelos de 110 V y 220 V, sin mostrar los de 24 V | Primero conserva el voltaje: sugiere `761X30-11370000/A`, de 24 V DC |
 
 **Límite conocido:** el orden de las alternativas es una regla razonable, no una verdad de ingeniería. Cuál sirve realmente depende de la planta, y por eso cada alternativa muestra sus diferencias.
+
+### Agente y API (Fase 3)
+
+**Cómo se arma cada turno:** el LLM no recuerda nada entre una pregunta y otra. En cada turno, el backend le envía la conversación guardada en Postgres. Al texto de cada respuesta anterior, el código le agrega los part numbers que se consultaron:
+
+```
+Usuario: ¿Cuánto torque da el 2A a 110 V?
+Agente:  El 2A da 150 Nm en On/Off.  [Modelos consultados: 762A00-11300000/A]
+Usuario: ¿y cuánta potencia consume?
+→ el agente vuelve a consultar 762A00-11300000/A y obtiene 40 W de la base
+```
+
+| Decisión | Por qué | Descartado |
+|---|---|---|
+| Elegir el modelo comparando 3 candidatos con preguntas de prueba | El más barato puede fallar al llamar tools, y eso no se ve en una tabla de precios | Elegir solo por precio u opinión |
+| En los seguimientos, volver a consultar la tool | Cada número sale de la base en el turno en que se muestra, y aparece en el debug de ese turno | Guardar en el historial los datos de turnos anteriores: más tokens y números viejos que no aparecen en el debug |
+| Agregar al historial los part numbers consultados, escritos por el código | El LLM sabe el modelo exacto aunque la respuesta haya dicho "el 2A", que son 3 modelos | Solo el texto: el LLM podría consultar el modelo equivocado o volver a preguntar |
+| Verificar con código los números de la respuesta | Las instrucciones al LLM no son una garantía. Un número que no aparece en lo que devolvieron las tools queda marcado en el debug | No revisar; o reintentar solo, que gasta presupuesto en falsos positivos como "te muestro 3 modelos" |
+| `products` sale de la salida de las tools | La app muestra números que salieron de la base, no del texto del LLM | Pedirle al LLM que arme la lista |
+| `debug` siempre en la respuesta; la app lo oculta | No contiene datos sensibles, y el historial también lo necesita | Activarlo con un parámetro: más complejidad sin beneficio, porque no hay login |
+| El backend crea las tablas y carga los datos al arrancar | Quien evalúa solo corre `docker compose up` | Pedir que corran `ingest.py` a mano |
+| Un turno se guarda completo o no se guarda | Si el LLM falla, no quedan preguntas sin respuesta ni conversaciones vacías | Guardar la pregunta antes de responder |
+| `needs_clarification` lo decide el código | Es `true` si una tool respondió `ambiguous`, `not_found`, `needs_requirements` o rechazó un argumento, como un torque sin unidad | Pedirle al LLM que lo indique |
+| Un límite de 12 pasos por turno | Un modelo confundido no puede llamar tools sin fin y gastar presupuesto | Sin límite |
+| Validar la pregunta antes de revisar la clave | Una pregunta vacía es un error del cliente (422), no del servidor (503) | Revisar la clave primero: lo encontró una prueba con Docker |
+
+**Qué hace cada archivo:**
+
+| Archivo | Qué hace |
+|---|---|
+| `backend/app/api.py` | Los endpoints. Al arrancar crea las tablas y carga los datos |
+| `backend/app/agent.py` | Las instrucciones del LLM, el historial con los part numbers, `products`, `needs_clarification` y el debug |
+| `backend/app/numbers.py` | El verificador de números. Entiende "2,3" y "2.3", y "4,800" y "4.800" |
+| `backend/app/conversations.py` | Guarda y lee las conversaciones; un turno se guarda en una sola transacción |
+| `backend/eval_agent.py` | Corre las mismas 14 preguntas con varios modelos y mide el costo real |
+| `backend/tests/fake_llm.py` | Un LLM falso que repite respuestas escritas en el test, para probar sin gastar |
+
+**El verificador de números, con ejemplos:**
+
+| Respuesta | Lo que devolvió la tool | Resultado |
+|---|---|---|
+| "Consume 40 W" | `motor_power_w: 40` | Verificado |
+| "Consume 2,3 A" | `fla_a: 2.3` | Verificado |
+| "Te muestro 3 modelos" | Nada con 3 | Se ignora: los números enteros hasta 10 suelen ser cantidades |
+| "Consume 45 W" | `motor_power_w: 40` | **Marcado** en `debug.unverified_numbers` |
+
+**El modelo:** `openai/gpt-5-mini` es provisional. Se elegirá con `eval_agent.py`, que corre 14 preguntas con 3 candidatos. Cada una se califica con código a partir de lo que devolvieron las tools, y el script mide lo que realmente se gastó.
 
 ### Proyecto
 

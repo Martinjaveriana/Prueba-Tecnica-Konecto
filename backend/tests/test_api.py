@@ -1,0 +1,152 @@
+"""The REST API with a scripted LLM. Requires the database: docker compose up -d --wait db"""
+
+from uuid import uuid4
+
+import openai
+import httpx
+import psycopg
+import pytest
+from fastapi.testclient import TestClient
+
+from app.api import app, get_chat_model
+from app.config import settings
+from tests.fake_llm import call, say, scripted
+
+# Every question here starts with this mark, so the tests can delete only their own conversations.
+MARK = "[test]"
+
+
+@pytest.fixture(autouse=True)
+def clean_test_sessions():
+    yield
+    app.dependency_overrides.clear()
+    with psycopg.connect(settings.database_url) as conn:
+        conn.execute("DELETE FROM sessions WHERE title LIKE %s", (MARK + "%",))
+
+
+def client_with(*replies) -> TestClient:
+    model = scripted(*replies)
+    app.dependency_overrides[get_chat_model] = lambda: model
+    return TestClient(app)
+
+
+def ask(client: TestClient, query: str, session_id=None):
+    body = {"query": f"{MARK} {query}"}
+    if session_id:
+        body["session_id"] = str(session_id)
+    return client.post("/api/conversation", json=body)
+
+
+def test_a_question_without_session_starts_a_conversation():
+    with client_with(call("get_actuator_specs", identifier="762A00-11300000/A"), say("On/Off gives 150 Nm.")) as client:
+        response = ask(client, "Torque of 762A00-11300000/A?")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["session_id"]
+    assert body["answer"] == "On/Off gives 150 Nm."
+    assert body["products"][0]["part_number"] == "762A00-11300000/A"
+    assert body["needs_clarification"] is False
+    assert body["debug"]["tool_calls"][0]["name"] == "get_actuator_specs"
+
+
+def test_a_follow_up_continues_the_same_conversation():
+    with client_with(
+        call("get_actuator_specs", identifier="762A00-11300000/A"), say("On/Off gives 150 Nm."),
+        call("get_actuator_specs", "call-2", identifier="762A00-11300000/A"), say("It draws 40 W."),
+    ) as client:
+        first = ask(client, "Torque of the 2A at 110 V?").json()
+        second = ask(client, "And how much power does it draw?", first["session_id"]).json()
+        messages = client.get(f"/api/sessions/{first['session_id']}/messages").json()["messages"]
+
+    assert second["session_id"] == first["session_id"]
+    assert second["products"][0]["motor_power_w"] == 40
+    assert [m["role"] for m in messages] == ["user", "assistant", "user", "assistant"]
+
+
+def test_conversations_survive_a_restart():
+    with client_with(say("I can only help with Series 76 actuators.")) as client:
+        session_id = ask(client, "Hello").json()["session_id"]
+
+    # A new client starts the app again: the history must come from the database.
+    with TestClient(app) as restarted:
+        assert restarted.get(f"/api/sessions/{session_id}/messages").status_code == 200
+        assert any(s["id"] == session_id for s in restarted.get("/api/sessions").json())
+
+
+def test_sessions_list_has_title_and_date():
+    with client_with(say("Which voltage?")) as client:
+        session_id = ask(client, "What about the 1A? " + "x" * 100).json()["session_id"]
+        session = next(s for s in client.get("/api/sessions").json() if s["id"] == session_id)
+    assert session["title"].startswith(MARK)
+    assert len(session["title"]) <= 60
+    assert session["message_count"] == 2
+    assert session["created_at"]
+
+
+def test_messages_keep_products_and_debug_to_resume_the_chat():
+    with client_with(call("get_actuator_specs", identifier="1A"), say("Which voltage?")) as client:
+        session_id = ask(client, "What about the 1A?").json()["session_id"]
+        assistant = client.get(f"/api/sessions/{session_id}/messages").json()["messages"][1]
+    assert assistant["needs_clarification"] is True
+    assert len(assistant["products"]) == 3
+    assert assistant["debug"]["tool_calls"][0]["args"] == {"identifier": "1A"}
+
+
+def test_an_unknown_conversation_is_not_found():
+    with client_with(say("unused")) as client:
+        assert ask(client, "Hello", uuid4()).status_code == 404
+        assert client.get(f"/api/sessions/{uuid4()}/messages").status_code == 404
+
+
+@pytest.mark.parametrize("body", [{"query": ""}, {}, {"query": "Hi", "session_id": "not-a-uuid"}])
+def test_invalid_requests_are_rejected(body):
+    with client_with(say("unused")) as client:
+        assert client.post("/api/conversation", json=body).status_code == 422
+
+
+def openrouter_error(status: int) -> openai.APIStatusError:
+    response = httpx.Response(status, request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"))
+    return openai.APIStatusError("error", response=response, body=None)
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        openrouter_error(402),
+        openrouter_error(500),
+        openai.APITimeoutError(httpx.Request("POST", "https://openrouter.ai")),
+    ],
+)
+def test_a_language_model_failure_returns_503_and_saves_nothing(error, monkeypatch):
+    def failing_turn(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr("app.api.run_turn", failing_turn)
+    with client_with(say("unused")) as client:
+        before = len(client.get("/api/sessions").json())
+        response = ask(client, "Torque of 762A00-11300000/A?")
+        after = len(client.get("/api/sessions").json())
+    assert response.status_code == 503
+    assert "language model" in response.json()["detail"]
+    assert after == before
+
+
+def test_without_a_key_the_api_says_how_to_configure_it(monkeypatch):
+    monkeypatch.setattr(settings, "openrouter_api_key", "")
+    with TestClient(app) as client:
+        response = ask(client, "Hello")
+    assert response.status_code == 503
+    assert "OPENROUTER_API_KEY" in response.json()["detail"]
+
+
+def test_without_a_key_an_invalid_request_is_still_reported_as_invalid(monkeypatch):
+    monkeypatch.setattr(settings, "openrouter_api_key", "")
+    with TestClient(app) as client:
+        assert client.post("/api/conversation", json={"query": ""}).status_code == 422
+
+
+def test_health_reports_the_database_and_the_key():
+    with TestClient(app) as client:
+        body = client.get("/health").json()
+    assert body["status"] == "ok"
+    assert "language_model_configured" in body

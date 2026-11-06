@@ -15,5 +15,21 @@ services:
       timeout: 3s
       retries: 20
 
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside Docker the database is the "db" service, not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-konecto}:${POSTGRES_PASSWORD:-konecto}@db:5432/${POSTGRES_DB:-series76}
+    ports:
+      # Open on every interface, so a phone on the same network can reach it.
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   db_data:

@@ -8,13 +8,13 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 |---|---|
 | Data ingestion from the PDF | Done |
 | Agent tools, tested without an LLM | Done |
-| Agent, REST API and conversation history | Not built yet |
-| Backend `Dockerfile` | Not built yet |
+| Agent, REST API and conversation history | Done. The default model is provisional until the comparison below runs |
+| Backend `Dockerfile` | Done |
 | Android app | Not built yet |
 
 ## Quick start
 
-**You need:** [Docker](https://docs.docker.com/get-docker/) with Docker Compose, and [uv](https://docs.astral.sh/uv/getting-started/installation/), which installs the right Python version by itself. No API key is needed for anything in this section.
+**You need:** [Docker](https://docs.docker.com/get-docker/) with Docker Compose, and an [OpenRouter](https://openrouter.ai/) API key for the agent to answer.
 
 From the root of the repository, create your configuration:
 
@@ -22,7 +22,39 @@ From the root of the repository, create your configuration:
 cp .env.example .env
 ```
 
-Start the database:
+Open `.env` and set `OPENROUTER_API_KEY` to your key.
+
+Start the database and the backend:
+
+```bash
+docker compose up -d --build --wait
+```
+
+On startup the backend creates its tables and loads the 68 actuator models, so you do not need to run the ingestion yourself. Open the interactive API documentation at <http://localhost:8000/docs>, or ask a question from the terminal:
+
+```bash
+curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "What is the output torque of 762A00-11300000/A?"}'
+```
+
+To continue that conversation, send the `session_id` from the response along with the next question:
+
+```bash
+curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"session_id": "PASTE-IT-HERE", "query": "And how much power does it draw?"}'
+```
+
+Without a key everything else works, and asking a question returns a 503 that says the key is missing.
+
+## Running the backend without Docker
+
+For development. You also need [uv](https://docs.astral.sh/uv/getting-started/installation/), which installs the right Python version by itself.
+
+If the Docker backend is running, stop it so port 8000 is free:
+
+```bash
+docker compose stop backend
+```
+
+Start the database, from the root of the repository:
 
 ```bash
 docker compose up -d --wait db
@@ -46,25 +78,74 @@ You should see:
 Loaded: actuators=68, service_ratings=111, electrical_ratings=118
 ```
 
-Run the tests:
+Start the API, which reloads when the code changes:
+
+```bash
+uv run uvicorn app.api:app --reload
+```
+
+Run the tests. They use a scripted language model, so they spend nothing:
 
 ```bash
 uv run pytest
 ```
 
-Try the tools the agent will use. This calls no LLM and spends nothing:
+Try the tools the agent uses, without any language model:
 
 ```bash
 uv run python try_tools.py recommend min_torque=500 torque_unit=nm service=on_off voltage_v=110 enclosure=weatherproof
 ```
 
-The port on your machine is `5433`, so it does not clash with a local PostgreSQL. To use another one, change `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
+The database port on your machine is `5433`, so it does not clash with a local PostgreSQL. To use another one, change `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/conversation` | Ask a question. Without `session_id`, a new conversation starts |
+| `GET /api/sessions` | Saved conversations, most recent first: id, title, dates and message count |
+| `GET /api/sessions/{id}/messages` | A conversation with every message, to resume it |
+| `GET /health` | Whether the database answers and the key is configured |
+
+The response of `POST /api/conversation`:
+
+| Field | Contents |
+|---|---|
+| `session_id`, `answer` | The fields the assessment fixes |
+| `products` | The models the tools returned, with every value from the tables. Each has a `role`: `specs`, `match`, `alternative`, `option`, `suggestion` or `no_data` |
+| `needs_clarification` | `true` when the user must add information, such as a voltage or a torque unit |
+| `debug` | Tools called, their arguments and results, model, tokens, latency and the number check. For the debug screen; end users do not see it |
+
+`products` and `needs_clarification` are built by code from the tool results, never from the model's text, so the app shows numbers that come from the database. Errors: `404` for an unknown conversation, `422` for an invalid request and `503` when the language model or the database is not available. A failed question is not saved.
+
+## How the agent answers
+
+1. The backend loads the conversation from PostgreSQL and sends the model the text of the latest turns. After each earlier answer it adds the part numbers that answer looked up: `[Part numbers consulted: 762A00-11300000/A]`.
+2. The model calls a tool. For a follow-up such as "and how much power does it draw?" it looks the model up again with that exact part number, so the number comes from the database in this turn.
+3. Code checks that every number in the answer appears in what the tools returned. Any that does not is listed in `debug.unverified_numbers`.
+4. The question and the answer are saved together, or not at all.
+
+## Language model
+
+The model is set with `LLM_MODEL` in `.env`, and any OpenRouter model that supports tool calling works. `openai/gpt-5-mini` is the provisional default. The final choice will come from running the same 14 checks on three candidates. The checks are decided by code from the tool results, and the script reports the measured cost:
+
+```bash
+uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
+```
+
+Estimated cost per question, from OpenRouter prices on November 6, 2026, assuming about 10,000 input and 600 output tokens:
+
+| Model | Per question | Questions with USD 10 |
+|---|---|---|
+| `qwen/qwen3.7-flash` | about USD 0.0004 | about 26,000 |
+| `anthropic/claude-haiku-5.5` | about USD 0.0013 | about 7,700 |
+| `openai/gpt-5-mini` | about USD 0.0037 | about 2,700 |
 
 ## Data ingestion
 
 ### You only need one command
 
-The tables in `series_76_electric_data.pdf` are images, so reading them takes OCR, which weighs several GB. Its reviewed result is versioned in this repository. **The Quick start already loaded it, so you do not need to read the PDF again to run the project.** The other commands exist so you can verify where the data comes from.
+The tables in `series_76_electric_data.pdf` are images, so reading them takes OCR, which weighs several GB. Its reviewed result is versioned in this repository, and the backend loads it on startup. **You do not need to read the PDF again to run the project.** The other commands exist so you can verify where the data comes from.
 
 | What you want | Command, from `backend/` | Needs | Changes |
 |---|---|---|---|
@@ -161,6 +242,8 @@ uv run python try_tools.py options
 | Rules report; they never correct | A rule can tell that something is wrong, not which cell is | Each misread value needs a person to check it |
 | Torque compared in the unit requested | The PDF rounds each column: 880 in-lbs is listed as 100 Nm, but 100 Nm is about 885 in-lbs. Converting would wrongly reject that model | Only units missing from the PDF are converted |
 | 3-phase ratings stored as "unspecified" | The table gives one torque and does not say which service it applies to | Results need a visible warning |
+| Follow-ups look the model up again; history carries part numbers, not old data | Every number comes from the database in the turn that shows it, and appears in that turn's debug | One more tool call per follow-up |
+| Code checks the numbers in each answer | A prompt is not a guarantee | It reports, never blocks: counts such as "3 models" are not in the tables |
 | Tightest fit first; alternatives only if nothing qualifies | Asked-for results first, and much larger actuators are usually unnecessary | The order of alternatives is a reasonable rule, not an engineering truth |
 
 Every decision, the alternatives rejected and the OCR tools compared are in [docs/decisiones-de-diseno.md](docs/decisiones-de-diseno.md), in Spanish. So are the [command guide](docs/guia-de-comandos.md) and the [guide to correcting the data](docs/guia-de-correcciones.md).
@@ -169,11 +252,13 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 
 | What you see | What it means | What to do |
 |---|---|---|
+| `The language model is not configured` | `OPENROUTER_API_KEY` is missing | Set it in `.env`, then `docker compose up -d` again |
+| `The language model could not answer` | OpenRouter failed, for example because the key has no credit left | Check the key on OpenRouter, or try again |
 | `Cannot connect to the database` | The database is not running | From the root: `docker compose up -d --wait db` |
 | `can't open file ... ingest.py` | You are not in `backend/` | `cd backend` first |
 | `No module named 'pydantic_settings'` | You ran plain `python` instead of `uv run` | Start the command with `uv run python` |
 | `--extract and --audit need the optional dependencies` | You left out `--group extract` | Use the command it prints |
-| `port is already allocated` | Port 5433 is in use | Change `POSTGRES_PORT` and `DATABASE_URL` in `.env` |
+| `port is already allocated` | Port 5433 or 8000 is in use | Change `POSTGRES_PORT` and `DATABASE_URL`, or `BACKEND_PORT`, in `.env` |
 | `N problems, nothing was written` | A value failed validation, so the previous data was kept | See the [guide to correcting the data](docs/guia-de-correcciones.md) |
 | `There is no saved reading` | That audit model has not been run | Set `GOOGLE_API_KEY` in `.env` |
 
@@ -184,7 +269,9 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `backend/ingest.py` | The ingestion script |
 | `backend/ingestion/` | Its stages: structure, extract, build, load, audit |
 | `backend/data/` | Raw, corrected, processed and audit data |
-| `backend/app/` | Configuration, database schema, queries and agent tools |
+| `backend/app/` | API (`api.py`), agent (`agent.py`), number check (`numbers.py`), conversations, queries (`catalog.py`), tools and schema |
+| `backend/eval_agent.py` | Compares language models on the same questions |
+| `backend/Dockerfile` | The backend image, without the OCR dependencies |
 | `backend/tests/` | Tests |
 | `docs/` | The assessment, source PDFs and project guides |
 | `.claude/` | AI assistant configuration, together with `CLAUDE.md` |

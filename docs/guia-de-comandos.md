@@ -21,6 +21,8 @@ Parten de que ya hiciste la preparación inicial, más abajo.
 
 | Quiero... | Pasos |
 |---|---|
+| **Levantar todo y conversar con el agente** | [Levantar el backend con Docker](#levantar-el-backend-con-docker) y [preguntar](#preguntar-desde-la-terminal) |
+| Trabajar en el código del backend | [Levantar la base](#levantar-la-base), [cargar los datos](#cargar-los-datos) y [correr la API sin Docker](#correr-la-api-sin-docker) |
 | Tener los datos en la base | [Levantar la base](#levantar-la-base) y [cargar los datos](#cargar-los-datos) |
 | Comprobar que todo está bien | [Levantar la base](#levantar-la-base) y [correr los tests](#correr-los-tests) |
 | Volver a leer el PDF | [Extraer](#extraer-del-pdf), revisar con `git diff`, [correr los tests](#correr-los-tests) y [cargar los datos](#cargar-los-datos) |
@@ -37,7 +39,61 @@ Crea tu configuración. Si ya tienes un `.env` con claves, no lo ejecutes, porqu
 cp .env.example .env
 ```
 
-Para auditar, pon tu clave en `GOOGLE_API_KEY` dentro de `.env`.
+Para que el agente responda, pon tu clave en `OPENROUTER_API_KEY` dentro de `.env`. Para auditar, pon la de Google en `GOOGLE_API_KEY`.
+
+## Backend y API
+
+### Levantar el backend con Docker
+
+Desde la raíz del repo. Levanta la base y el backend, crea las tablas y carga los datos. Después de cambiar el código o el `.env`, vuelve a correrlo.
+
+```bash
+docker compose up -d --build --wait
+```
+
+La documentación interactiva queda en <http://localhost:8000/docs>.
+
+### Ver los registros del backend
+
+```bash
+docker compose logs -f backend
+```
+
+### Preguntar desde la terminal
+
+Gasta de la clave de OpenRouter.
+
+```bash
+curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "What is the output torque of 762A00-11300000/A?"}'
+```
+
+Para seguir la misma conversación, agrega el `session_id` que devolvió la respuesta:
+
+```bash
+curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"session_id": "PEGALO-AQUI", "query": "And how much power does it draw?"}'
+```
+
+### Ver las conversaciones guardadas
+
+```bash
+curl -s http://localhost:8000/api/sessions
+```
+
+### Correr la API sin Docker
+
+Desde `backend/`, con la base levantada. Se recarga sola cuando cambia el código. Si el backend de Docker está corriendo, primero detenlo con `docker compose stop backend`, porque usan el mismo puerto.
+
+```bash
+uv run uvicorn app.api:app --reload
+```
+
+### Comparar modelos
+
+Desde `backend/`. Gasta de la clave de OpenRouter, unos centavos por modelo. Corre las mismas 14 preguntas con cada modelo y guarda el resultado en `eval/results.json`.
+
+```bash
+uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
+```
 
 ## Base de datos
 
@@ -190,6 +246,8 @@ uv run pytest tests/test_build.py
 
 | Mensaje | Qué significa | Qué hacer |
 |---|---|---|
+| `The language model is not configured` | Falta `OPENROUTER_API_KEY` | Ponerla en `.env` y volver a levantar el backend |
+| `The language model could not answer` | OpenRouter falló, por ejemplo por falta de saldo | Revisar la clave en OpenRouter o reintentar |
 | `Cannot connect to the database` | La base no está levantada | [Levantar la base](#levantar-la-base) |
 | `can't open file ... ingest.py` | No estás en `backend/` | `cd backend` primero |
 | `--extract and --audit need the optional dependencies` | Falta `--group extract` | Usar el comando que muestra el mensaje |

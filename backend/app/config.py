@@ -15,5 +15,17 @@ class Settings(BaseSettings):
     google_api_key: str = ""
     audit_model: str = "gemini-3.5-flash"
 
+    openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    llm_model: str = "openai/gpt-5-mini"
+    llm_temperature: float | None = 0
+    llm_max_tokens: int = 1000
+    llm_timeout_sec: float = 60
+    # Upper bound on model and tool steps in one turn, so a confused model cannot loop and spend budget.
+    agent_max_steps: int = 12
+
+    def has_openrouter_key(self) -> bool:
+        return bool(self.openrouter_api_key) and not self.openrouter_api_key.startswith("your-")
+
 
 settings = Settings()

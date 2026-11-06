@@ -61,7 +61,9 @@ def show(result: dict | str) -> None:
 
     if "options" in result:
         print(f"{result['total']} models:")
-    for model in result.get("options", []) + result.get("suggestions", []):
+    if "alternatives" in result:
+        print("Alternatives with data:")
+    for model in result.get("options", []) + result.get("suggestions", []) + result.get("alternatives", []):
         print(f"  {describe(model)}")
 
     if "matches" in result:

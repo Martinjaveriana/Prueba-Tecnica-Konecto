@@ -105,6 +105,16 @@ def test_na_model_exists_but_has_no_data():
     assert catalog.NOTE_NO_DATA in result["actuator"]["notes"]
 
 
+def test_na_model_offers_the_same_model_on_another_supply_and_the_smallest_on_its_supply():
+    result = find_actuator("1A", voltage_v=220, phases=3)
+    assert result["status"] == "no_data"
+    assert [a["part_number"] for a in result["alternatives"]] == [
+        "761A00-11300000/A",
+        "761A00-11320000/A",
+        "763A00-11330C00/A",
+    ]
+
+
 def test_a_mistyped_number_is_not_corrected_silently():
     result = find_actuator("761800-11300000/A")
     assert result["status"] == "not_found"
