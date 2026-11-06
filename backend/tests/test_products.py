@@ -103,3 +103,47 @@ def test_the_docs_describe_every_product_field():
         schemas = client.get("/openapi.json").json()["components"]["schemas"]
     assert set(schemas["Product"]["properties"]) == FIELDS
     assert "ServiceRating" in schemas and "ElectricalRating" in schemas
+
+
+# ---------- focus: where the app's comparison table opens ----------
+
+
+def focus_of(*calls):
+    return run_turn("question", [], scripted(*calls, say("answer"))).focus
+
+
+def test_focus_follows_the_service_and_frequency_asked_for():
+    assert focus_of(call("recommend_actuators", min_torque=100, torque_unit="nm", service="modulating", frequency_hz=50)) == {
+        "service": "modulating", "frequency_hz": 50,
+    }
+
+
+def test_focus_is_empty_when_the_user_did_not_say():
+    assert focus_of(call("get_actuator_specs", identifier="762A00-11300000/A")) == {"service": None, "frequency_hz": None}
+    assert focus_of() == {"service": None, "frequency_hz": None}
+
+
+def test_focus_comes_from_the_last_call_that_worked():
+    focus = focus_of(
+        call("recommend_actuators", "c1", min_torque=100, torque_unit="nm", service="on_off"),
+        call("get_actuator_specs", "c2", identifier="762A00-11300000/A", service="modulating"),
+        call("recommend_actuators", "c3", min_torque=500, service="on_off"),  # rejected: no unit
+    )
+    assert focus == {"service": "modulating", "frequency_hz": None}
+
+
+def test_saved_messages_get_their_focus_back():
+    with TestClient(app) as client:
+        model = scripted(call("recommend_actuators", min_torque=100, torque_unit="nm", service="modulating"), say("x"))
+        from app.api import get_chat_model
+        app.dependency_overrides[get_chat_model] = lambda: model
+        try:
+            body = client.post("/api/conversation", json={"query": "[test] focus"}).json()
+            messages = client.get(f"/api/sessions/{body['session_id']}/messages").json()["messages"]
+        finally:
+            app.dependency_overrides.clear()
+            with psycopg.connect(settings.database_url) as conn:
+                conn.execute("DELETE FROM sessions WHERE id = %s", (body["session_id"],))
+    assert body["focus"] == {"service": "modulating", "frequency_hz": None}
+    assert messages[1]["focus"] == body["focus"]
+    assert messages[0]["focus"] == {"service": None, "frequency_hz": None}

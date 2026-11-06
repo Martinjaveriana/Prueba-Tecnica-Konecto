@@ -132,6 +132,7 @@ The response of `POST /api/conversation`:
 |---|---|
 | `session_id`, `answer` | The fields the assessment fixes |
 | `products` | The models the answer is about, always with the same fields (the `Product` schema in `/docs`), filled from the database. Each has a `role`: `specs`, `match`, `alternative`, `option`, `suggestion` or `no_data`. Alternatives add `differences`: why each one does not meet a requirement |
+| `focus` | The service and frequency the question was about, taken by code from the tool arguments. The app's comparison table opens there; `null` means On/Off at 60 Hz |
 | `needs_clarification` | `true` when the user must add information, such as a voltage or a torque unit |
 | `debug` | Tools called, their arguments and results, model, tokens, latency and the number check. For the debug screen; end users do not see it |
 

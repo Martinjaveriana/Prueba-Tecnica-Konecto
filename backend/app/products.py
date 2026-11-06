@@ -115,3 +115,26 @@ def readable(saved: list[dict]) -> list[dict]:
         return [Product.model_validate(p).model_dump(mode="json") for p in saved]
     except ValueError:
         return complete(saved)
+
+
+class Focus(BaseModel):
+    """Which service and frequency the user asked about, so the app's table opens there.
+
+    Taken by code from the arguments of the last lookup or recommendation, never from the LLM's text.
+    null means the user did not say: the app then opens On/Off at 60 Hz.
+    """
+
+    service: Literal["on_off", "modulating"] | None = None
+    frequency_hz: Literal[50, 60] | None = None
+
+
+FOCUS_TOOLS = {"get_actuator_specs", "recommend_actuators"}
+
+
+def focus_from(tool_calls: list[dict]) -> dict:
+    for call in reversed(tool_calls):
+        # A call the tool rejected comes back as text; its arguments were not used.
+        if call["name"] in FOCUS_TOOLS and isinstance(call.get("output"), dict):
+            args = call["args"]
+            return Focus(service=args.get("service"), frequency_hz=args.get("frequency_hz")).model_dump()
+    return Focus().model_dump()

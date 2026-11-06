@@ -16,7 +16,7 @@ from langchain_openai import ChatOpenAI
 
 from app.config import settings
 from app.numbers import unverified_numbers
-from app.products import complete, roles_from
+from app.products import complete, focus_from, roles_from
 from app.tools import TOOLS
 
 SYSTEM_PROMPT = """You are the technical assistant for Series 76 electric actuators, used by plant engineers to look up
@@ -71,6 +71,7 @@ class TurnResult:
     answer: str
     products: list[dict]
     needs_clarification: bool
+    focus: dict = field(default_factory=dict)
     debug: dict = field(default_factory=dict)
 
 
@@ -168,4 +169,10 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         "output_tokens": sum(u.get("output_tokens", 0) for u in usage),
         "latency_ms": round((time.monotonic() - started) * 1000),
     }
-    return TurnResult(answer=answer, products=products, needs_clarification=needs_clarification, debug=debug)
+    return TurnResult(
+        answer=answer,
+        products=products,
+        needs_clarification=needs_clarification,
+        focus=focus_from(tool_calls),
+        debug=debug,
+    )
