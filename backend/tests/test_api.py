@@ -1,5 +1,6 @@
 """The REST API with a scripted LLM. Requires the database: docker compose up -d --wait db"""
 
+import threading
 from uuid import uuid4
 
 import openai
@@ -8,6 +9,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app import api
 from app.api import app, get_chat_model
 from app.config import settings
 from tests.fake_llm import call, say, scripted
@@ -159,3 +161,46 @@ def test_health_reports_the_database_and_the_key():
         body = client.get("/health").json()
     assert body["status"] == "ok"
     assert "language_model_configured" in body
+
+
+# The backend must stay up while the database is down: crashing made Docker restart it in a loop.
+
+def database_down(*args, **kwargs):
+    raise psycopg.OperationalError("connection refused")
+
+
+def test_the_backend_starts_without_the_database_and_answers_503(monkeypatch):
+    monkeypatch.setattr("app.api.load", database_down)
+    with TestClient(app) as client:
+        health = client.get("/health")
+        listing = client.get("/api/sessions")
+    assert health.status_code == 503
+    assert health.json()["database"] == "starting"
+    assert listing.status_code == 503
+    assert "not available yet" in listing.json()["detail"]
+
+
+def test_it_keeps_retrying_until_the_database_comes_back(monkeypatch):
+    attempts = []
+
+    def comes_back_on_the_third_try(actuators):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise psycopg.OperationalError("connection refused")
+        return {"actuators": len(actuators)}
+
+    monkeypatch.setattr("app.api.load", comes_back_on_the_third_try)
+    monkeypatch.setattr("app.api.FIRST_RETRY_SEC", 0.01)
+    api.data_ready.clear()
+    stop = threading.Event()
+    api.keep_trying([], stop)
+    assert len(attempts) == 3
+    assert api.data_ready.is_set()
+
+
+def test_health_says_when_the_database_goes_down_after_starting(monkeypatch):
+    with TestClient(app) as client:
+        monkeypatch.setattr(settings, "database_url", "postgresql://nobody@127.0.0.1:1/none")
+        response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json()["database"] == "unavailable"

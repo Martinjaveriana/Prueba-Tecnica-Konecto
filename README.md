@@ -105,7 +105,7 @@ The database port on your machine is `5433`, so it does not clash with a local P
 | `POST /api/conversation` | Ask a question. Without `session_id`, a new conversation starts |
 | `GET /api/sessions` | Saved conversations, most recent first: id, title, dates and message count |
 | `GET /api/sessions/{id}/messages` | A conversation with every message, to resume it |
-| `GET /health` | Whether the database answers and the key is configured |
+| `GET /health` | `200` when the API can answer; `503` while the database is down or the catalog is loading. Also says whether the key is configured |
 
 The response of `POST /api/conversation`:
 
@@ -117,6 +117,8 @@ The response of `POST /api/conversation`:
 | `debug` | Tools called, their arguments and results, model, tokens, latency and the number check. For the debug screen; end users do not see it |
 
 `products` and `needs_clarification` are built by code from the tool results, never from the model's text, so the app shows numbers that come from the database. Errors: `404` for an unknown conversation, `422` for an invalid request and `503` when the language model or the database is not available. A failed question is not saved.
+
+If the database is down when the backend starts, the backend starts anyway, answers `503` and keeps retrying in the background; it loads the data and recovers by itself when the database is back. It does not crash, so Docker does not restart it in a loop.
 
 ## How the agent answers
 

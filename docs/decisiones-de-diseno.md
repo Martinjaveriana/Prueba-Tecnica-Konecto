@@ -284,6 +284,8 @@ Usuario: ¿y cuánta potencia consume?
 | `products` sale de la salida de las tools | La app muestra números que salieron de la base, no del texto del LLM | Pedirle al LLM que arme la lista |
 | `debug` siempre en la respuesta; la app lo oculta | No contiene datos sensibles, y el historial también lo necesita | Activarlo con un parámetro: más complejidad sin beneficio, porque no hay login |
 | El backend crea las tablas y carga los datos al arrancar | Quien evalúa solo corre `docker compose up` | Pedir que corran `ingest.py` a mano |
+| Si la base no está, el backend arranca igual y reintenta en segundo plano (cada 2, 4, 8… hasta 30 s); mientras tanto responde 503 | La app recibe un 503 con un mensaje claro y se recupera sola cuando vuelve la base. Antes, el backend se caía a los 30 s y Docker lo reiniciaba en bucle: se vieron 102 reinicios con la base detenida | Caerse y dejar que Docker lo reinicie: ruido en `docker compose ps` y la API sin responder nada; o esperar sin límite antes de arrancar, que deja la API sin responder (conexión rechazada en vez de 503) |
+| `/health` responde 503 si la base no está o los datos no se cargaron | Docker marca el contenedor `unhealthy`, que es lo que pasa de verdad, sin reiniciarlo | Responder 200 siempre: `docker compose up --wait` creería que todo está bien |
 | Un turno se guarda completo o no se guarda | Si el LLM falla, no quedan preguntas sin respuesta ni conversaciones vacías | Guardar la pregunta antes de responder |
 | `needs_clarification` lo decide el código, con la última llamada a cada tool | Es `true` si esa llamada respondió `ambiguous`, `not_found`, `needs_requirements` o rechazó un argumento. Si el LLM corrige un argumento en el mismo turno, la llamada fallida ya no cuenta | Pedirle al LLM que lo indique; o contar cualquier llamada, que marcaba aclaración aunque el agente ya se hubiera corregido |
 | Un límite de 12 pasos por turno | Un modelo confundido no puede llamar tools sin fin y gastar presupuesto | Sin límite |
@@ -293,7 +295,7 @@ Usuario: ¿y cuánta potencia consume?
 
 | Archivo | Qué hace |
 |---|---|
-| `backend/app/api.py` | Los endpoints. Al arrancar crea las tablas y carga los datos |
+| `backend/app/api.py` | Los endpoints. Al arrancar crea las tablas y carga los datos; si la base no está, reintenta en segundo plano y responde 503 mientras tanto |
 | `backend/app/agent.py` | Las instrucciones del LLM, el historial con los part numbers, `products`, `needs_clarification` y el debug |
 | `backend/app/numbers.py` | El verificador de números. Entiende "2,3" y "2.3", y "4,800" y "4.800" |
 | `backend/app/conversations.py` | Guarda y lee las conversaciones; un turno se guarda en una sola transacción |

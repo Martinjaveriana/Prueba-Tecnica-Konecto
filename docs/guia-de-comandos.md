@@ -202,8 +202,9 @@ curl -s http://localhost:8000/api/sessions/PEGALO-AQUI/messages | jq
 | Conversación inexistente | `curl -s http://localhost:8000/api/sessions/00000000-0000-0000-0000-000000000000/messages` | 404 |
 | Pregunta vacía | `curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "   "}'` | 422, sin gastar |
 | Base apagada | `docker compose stop db` y luego `curl -s http://localhost:8000/health` | 503 con un mensaje claro |
+| Backend que arranca sin base | Con la base apagada, `docker compose restart backend` y luego `docker inspect konecto-backend-1 --format '{{.RestartCount}}'` | El backend sigue arriba, responde 503 y el contador de reinicios no sube |
 
-Después de la última prueba, vuelve a levantar la base con `docker compose start db`. El backend se recupera solo.
+Después de la última prueba, vuelve a levantar la base con `docker compose start db`. El backend se recupera solo: en `docker compose logs backend` verás `Database not available, will retry` y luego `Loaded`.
 
 ### 8. Ver qué pasa por dentro
 
