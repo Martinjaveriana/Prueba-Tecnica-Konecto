@@ -1,0 +1,28 @@
+<resources>
+    <string name="app_name">Series 76 Assistant</string>
+
+    <string name="conversations_title">Conversations</string>
+    <string name="new_conversation">New conversation</string>
+    <string name="no_conversations">No conversations yet</string>
+    <string name="no_conversations_hint">Ask about a Series 76 actuator by part number, or describe what you need.</string>
+    <string name="message_count">%1$d messages</string>
+
+    <string name="chat_title_new">New conversation</string>
+    <string name="back">Back</string>
+    <string name="you">You</string>
+    <string name="assistant">Assistant</string>
+    <string name="chat_coming_soon">Ask your first question here.</string>
+
+    <string name="local_network_title">Allow local network access</string>
+    <string name="local_network_why">The assistant\'s server runs on your computer or your local network. Android asks your permission before an app can reach it.</string>
+    <string name="local_network_denied">Without this permission the app cannot reach the server. If the dialog no longer appears, allow \"Nearby devices\" for this app in Settings.</string>
+    <string name="local_network_allow">Allow</string>
+    <string name="local_network_settings">Open settings</string>
+
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="error_unreachable">Can\'t reach the server. Check that the backend is running and the app points to it.</string>
+    <string name="error_unavailable">The assistant is temporarily unavailable. Try again in a moment.</string>
+    <string name="error_not_found">This conversation no longer exists.</string>
+    <string name="error_unexpected">Something went wrong (HTTP %1$d).</string>
+</resources>

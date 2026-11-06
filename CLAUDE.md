@@ -61,13 +61,20 @@ cd backend && uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-hai
 
 Los tests usan un LLM falso (`tests/fake_llm.py`) y no gastan presupuesto. No hay linter configurado todavía.
 
+App Android (desde `android/`; `JAVA_HOME` apunta al Java de Android Studio). Los tests no necesitan emulador; `installDebug` necesita el emulador y el backend arriba:
+```bash
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew assembleDebug testDebugUnitTest
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug
+~/Android/Sdk/emulator/emulator -avd Medium_Phone_API_37.0 -no-snapshot-save &
+```
+
 ## Estructura
 - `backend/`: Python 3.12 gestionado con `uv`. La configuración está en `app/config.py` y lee el `.env` de la raíz.
 - `backend/ingestion/`: la ingesta en etapas. `spec.py` declara la estructura de las 7 tablas, `extract.py` lee con Docling, `build.py` limpia y valida, `load.py` carga y `audit.py` compara con el modelo de visión.
 - `backend/app/api.py` (endpoints), `agent.py` (instrucciones, historial, debug), `products.py` (modelo `Product`: los mismos campos para todo producto, completados desde la base), `numbers.py` (verificador de números), `conversations.py` (persistencia). El LLM solo elige tools y redacta: lo demás lo decide el código.
 - `backend/app/catalog.py`: las consultas y las reglas de búsqueda, sin LLM. `backend/app/tools.py` las expone como tools de LangChain; la lógica va en `catalog.py`.
 - `backend/data/`: `raw/` (lo que leyó Docling), `corrections.json` (correcciones registradas), `processed/actuators.json` (la fuente de la carga). Un valor mal leído se resuelve en `corrections.json`, nunca editando `processed/`.
-- `android/`: app en Kotlin + Jetpack Compose (aún no existe).
+- `android/`: app en Kotlin + Jetpack Compose. `data/` (DTOs, Retrofit, `ConversationRepository` que traduce errores a `AppError`), `ui/` una carpeta por pantalla con su ViewModel, `AppContainer.kt` (inyección manual). Plugin de Android 9.5.1, Gradle 9.6.1, `minSdk` 26, `targetSdk` 37. En Android 17 pide `ACCESS_LOCAL_NETWORK`: sin él las conexiones a 10.0.2.2 se quedan colgadas.
 - `docs/`: enunciado (`assessment-en.pdf`) y los PDFs fuente.
 - PostgreSQL 16 se publica en el puerto **5433** de la máquina, porque el 5432 suele estar ocupado.
 
@@ -196,7 +203,7 @@ URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat
 2. **Fase 1, hecha:** `ingest.py`, validación, tests y esquema. Repetir `--extract` da archivos idénticos. La auditoría con `gemini-3.5-flash` comparó 869 celdas y encontró una diferencia, en la que el PDF confirma nuestro dato.
 3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
 4. **Fase 3, hecha:** agente, API, persistencia, verificador de números y Dockerfile. Modelo elegido: `anthropic/claude-haiku-5.5` (14/14, 3.2 s, USD 0.0007 por pregunta), comparado con GPT-5 mini y Qwen 3.7 Flash. Detalle en `docs/decisiones-de-diseno.md`.
-5. **Fase 4:** app Android.
+5. **Fase 4:** app Android. **4a hecha:** proyecto, lista de conversaciones, historial, estados de error y permiso de red local. Falta 4b (chat con envío, tarjetas y tabla de `products`) y 4c (debug, README de la app).
 6. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.
 
 ## Edge cases a cubrir y probar

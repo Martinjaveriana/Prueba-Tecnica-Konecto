@@ -1,0 +1,217 @@
+{
+ "id": "f78b58fe-4993-465b-b185-74e5e7f9a77b",
+ "title": "I changed my mind, I want to konw about 1A",
+ "created_at": "2026-11-06T16:58:50.759472Z",
+ "updated_at": "2026-11-06T16:58:50.759472Z",
+ "messages": [
+  {
+   "id": 159,
+   "role": "user",
+   "content": "I changed my mind, I want to konw about 1A",
+   "products": [],
+   "needs_clarification": false,
+   "debug": null,
+   "created_at": "2026-11-06T16:58:50.759472Z"
+  },
+  {
+   "id": 160,
+   "role": "assistant",
+   "content": "Alias 1A matches three Series 76 models:\n\n1. **761A00-11300000/A**: weatherproof, 110 V, single-phase, AC. Available as On/Off or Modulating.\n2. **761A00-11320000/A**: weatherproof, 220 V, single-phase, AC. Available as On/Off or Modulating.\n3. **761A00-11330C00/A**: weatherproof, 220 V, three-phase, AC. The table gives no values for this model.\n\nWhich voltage and service do you need? For the 1A models, I can show the full data for either the On/Off or the Modulating service.",
+   "products": [
+    {
+     "role": "option",
+     "part_number": "761A00-11300000/A",
+     "alias": "1A",
+     "enclosure": "weatherproof",
+     "voltage_v": 110,
+     "phases": 1,
+     "current_type": "AC",
+     "motor_power_w": 15,
+     "certifications": [
+      "CSA",
+      "CE",
+      "UKCA"
+     ],
+     "hazardous_classification": [],
+     "has_data": true,
+     "source_page": 1,
+     "service_ratings": [
+      {
+       "service": "modulating",
+       "torque_in_lbs": 580,
+       "torque_nm": 65,
+       "duty_cycle_pct": 40,
+       "cycles_per_hour": null,
+       "starts_per_hour": 960
+      },
+      {
+       "service": "on_off",
+       "torque_in_lbs": 700,
+       "torque_nm": 80,
+       "duty_cycle_pct": 40,
+       "cycles_per_hour": 36,
+       "starts_per_hour": null
+      }
+     ],
+     "electrical_ratings": [
+      {
+       "frequency_hz": 60,
+       "speed_sec": 17,
+       "fla_a": 1.2,
+       "lra_a": 1.4
+      },
+      {
+       "frequency_hz": 50,
+       "speed_sec": 20,
+       "fla_a": 1.1,
+       "lra_a": 1.3
+      }
+     ],
+     "notes": [],
+     "differences": []
+    },
+    {
+     "role": "option",
+     "part_number": "761A00-11320000/A",
+     "alias": "1A",
+     "enclosure": "weatherproof",
+     "voltage_v": 220,
+     "phases": 1,
+     "current_type": "AC",
+     "motor_power_w": 15,
+     "certifications": [
+      "CSA",
+      "CE",
+      "UKCA"
+     ],
+     "hazardous_classification": [],
+     "has_data": true,
+     "source_page": 1,
+     "service_ratings": [
+      {
+       "service": "modulating",
+       "torque_in_lbs": 580,
+       "torque_nm": 65,
+       "duty_cycle_pct": 40,
+       "cycles_per_hour": null,
+       "starts_per_hour": 960
+      },
+      {
+       "service": "on_off",
+       "torque_in_lbs": 700,
+       "torque_nm": 80,
+       "duty_cycle_pct": 40,
+       "cycles_per_hour": 36,
+       "starts_per_hour": null
+      }
+     ],
+     "electrical_ratings": [
+      {
+       "frequency_hz": 60,
+       "speed_sec": 17,
+       "fla_a": 0.7,
+       "lra_a": 0.7
+      },
+      {
+       "frequency_hz": 50,
+       "speed_sec": 20,
+       "fla_a": 0.7,
+       "lra_a": 0.7
+      }
+     ],
+     "notes": [],
+     "differences": []
+    },
+    {
+     "role": "option",
+     "part_number": "761A00-11330C00/A",
+     "alias": "1A",
+     "enclosure": "weatherproof",
+     "voltage_v": 220,
+     "phases": 3,
+     "current_type": "AC",
+     "motor_power_w": null,
+     "certifications": [
+      "CSA",
+      "CE",
+      "UKCA"
+     ],
+     "hazardous_classification": [],
+     "has_data": false,
+     "source_page": 2,
+     "service_ratings": [],
+     "electrical_ratings": [],
+     "notes": [
+      "The table lists this model as N/A: it exists, but the PDF gives no values for it."
+     ],
+     "differences": []
+    }
+   ],
+   "needs_clarification": true,
+   "debug": {
+    "model": "anthropic/claude-haiku-5.5",
+    "latency_ms": 5304,
+    "tool_calls": [
+     {
+      "args": {
+       "identifier": "1A"
+      },
+      "name": "get_actuator_specs",
+      "output": {
+       "query": "1A",
+       "total": 3,
+       "status": "ambiguous",
+       "message": "Several models match. Show them or ask which voltage and service the user needs.",
+       "options": [
+        {
+         "alias": "1A",
+         "phases": 1,
+         "has_data": true,
+         "services": [
+          "modulating",
+          "on_off"
+         ],
+         "enclosure": "weatherproof",
+         "voltage_v": 110,
+         "part_number": "761A00-11300000/A",
+         "current_type": "AC"
+        },
+        {
+         "alias": "1A",
+         "phases": 1,
+         "has_data": true,
+         "services": [
+          "modulating",
+          "on_off"
+         ],
+         "enclosure": "weatherproof",
+         "voltage_v": 220,
+         "part_number": "761A00-11320000/A",
+         "current_type": "AC"
+        },
+        {
+         "alias": "1A",
+         "phases": 3,
+         "has_data": false,
+         "services": [],
+         "enclosure": "weatherproof",
+         "voltage_v": 220,
+         "part_number": "761A00-11330C00/A",
+         "current_type": "AC"
+        }
+       ]
+      }
+     }
+    ],
+    "empty_answer": false,
+    "input_tokens": 6416,
+    "finish_reason": "stop",
+    "output_tokens": 401,
+    "marker_removed": false,
+    "unverified_numbers": [],
+    "part_numbers_consulted": []
+   },
+   "created_at": "2026-11-06T16:58:50.759472Z"
+  }
+ ]
+}

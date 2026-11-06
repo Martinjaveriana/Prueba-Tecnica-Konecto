@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds also allow plain HTTP to a computer on the local network, such as 192.168.1.50,
+     because the local backend has no HTTPS. Release builds use the stricter file in src/main. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

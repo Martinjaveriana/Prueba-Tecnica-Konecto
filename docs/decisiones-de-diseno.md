@@ -349,6 +349,49 @@ Usuario: ¿y cuánta potencia consume?
 
 **Un detalle de transparencia:** el asistente con el que se construyó el proyecto también es un modelo de Anthropic. Por eso los criterios se fijaron antes de correr la comparación, y cada pregunta se califica con código.
 
+### App Android (Fase 4a: base y lista de conversaciones)
+
+**Cómo fluye un dato:** al abrir la app, `ConversationsViewModel` pone el estado en "cargando" y le pide la lista al repositorio. El repositorio llama a `GET /api/sessions` con Retrofit y traduce cualquier falla a un `AppError`: sin conexión, 503, 404 u otro código. La pantalla solo dibuja el estado que recibe; por eso los ViewModels se prueban sin emulador.
+
+```
+Pantalla ──> ViewModel ──> ConversationRepository ──> Retrofit ──> backend
+   ▲             │ estado: sessions / loading / error
+   └─────────────┘
+```
+
+| Decisión | Por qué | Descartado |
+|---|---|---|
+| Una Activity, Compose y Navigation Compose con rutas tipadas | Pasar el `session_id` al chat es un parámetro de la ruta, revisado al compilar | Varias Activities: datos por `Intent` y más código |
+| MVVM: ViewModel con un estado y una pantalla que solo lo dibuja | Los estados (cargando, vacío, error) se prueban sin emulador | Clean Architecture con casos de uso: capas de más para 3 pantallas |
+| Retrofit, OkHttp y kotlinx.serialization | Es el estándar en Android y se lee fácil | Ktor client: también sirve, pero es menos común en Android |
+| Inyección manual con `AppContainer` | Crea el cliente una vez; sin plugins ni anotaciones que puedan fallar al compilar en otra máquina | Hilt |
+| El historial vive solo en el backend | Una sola fuente de verdad; el enunciado no pide modo sin conexión | Room: dos copias que habría que sincronizar |
+| El repositorio traduce errores a `AppError` | Las pantallas no saben de HTTP: "sin conexión" y "503" son mensajes distintos para el usuario | Mostrar el mensaje de la excepción: textos técnicos en pantalla |
+| Si la lista ya estaba cargada, un error aparece arriba sin borrarla | El usuario no pierde lo que ya veía cuando el backend se cae | Reemplazar la lista por la pantalla de error |
+| Un 404 en el chat no ofrece "Retry" | Reintentar no puede revivir una conversación borrada; la salida es volver | El mismo botón para todos los errores |
+| URL del backend en `BuildConfig`, `http://10.0.2.2:8000` por defecto, cambiable con `-PbackendUrl=` | El emulador ve el computador en 10.0.2.2; un celular necesita otra IP sin tocar el código | Escribirla fija en el código |
+| HTTP sin cifrar: en debug a cualquier host, en release solo a 10.0.2.2 y localhost | El backend local no tiene HTTPS, y un celular en la red local usa una IP como 192.168.1.50 | `usesCleartextTraffic="true"` para todo, también en release |
+| Pedir el permiso `ACCESS_LOCAL_NETWORK` en Android 17, con una pantalla que explica para qué | Sin él, Android 17 bloquea las conexiones de la app a IPs privadas como 10.0.2.2. La conexión no falla: se queda esperando hasta agotar el tiempo, y la app solo diría "no hay conexión" | Bajar `targetSdk` a 36 para esquivar la regla: evita el diálogo, pero es esconder el problema |
+| No pedir ese permiso si la URL es `localhost` (con `adb reverse`) | localhost no es la red local | Pedirlo siempre |
+| Textos de la app en inglés, en `strings.xml` | Konecto vende en Norteamérica y el agente responde en inglés | App en español: mezclaría idiomas con las respuestas |
+| Versiones: plugin de Android 9.5.1 y Gradle 9.6.1, las de este Android Studio; Gradle Wrapper con checksum | Quien clona compila con `./gradlew` y la misma versión, sin instalar Gradle | Sin wrapper: cada uno compilaría con su versión |
+| Un test lee una respuesta real del backend guardada en `src/test/resources` | Si el backend cambia un nombre de campo, falla un test en vez de quedar una celda vacía en la app | Probar solo con datos inventados |
+
+**Cómo se encontró lo del permiso:** la app mostraba "Can't reach the server" con el backend arriba. Desde la consola del emulador `10.0.2.2:8000` respondía, pero con el usuario de la app (`run-as`) la conexión se quedaba esperando. Apagar el Wi-Fi del emulador no cambió nada; otorgar `ACCESS_LOCAL_NETWORK` lo resolvió.
+
+**Qué hace cada archivo** (dentro de `android/app/src/main/java/com/series76/assistant/`, salvo los dos primeros):
+
+| Archivo | Qué hace |
+|---|---|
+| `android/app/build.gradle.kts` | Versiones, dependencias y la URL del backend (`backendUrl`) |
+| `res/xml/network_security_config.xml` | Dónde se permite HTTP sin cifrar (más abierto en `src/debug`) |
+| `data/Dtos.kt` | Las mismas respuestas del backend en Kotlin, incluido `Product` |
+| `data/ConversationRepository.kt` | Llama al backend y traduce errores a `AppError` |
+| `AppContainer.kt` | Crea Retrofit y el repositorio una sola vez |
+| `ui/conversations/` | La lista de conversaciones y su ViewModel |
+| `ui/chat/` | Por ahora, el historial de una conversación; en la 4b, el chat completo |
+| `ui/common/LocalNetworkGate.kt` | Pide el permiso de red local en Android 17 antes de mostrar la app |
+
 ### Proyecto
 
 | Decisión | Por qué | Descartado |

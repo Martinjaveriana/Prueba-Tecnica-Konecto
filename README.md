@@ -10,7 +10,8 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 | Agent tools, tested without an LLM | Done |
 | Agent, REST API and conversation history | Done |
 | Backend `Dockerfile` | Done |
-| Android app | Not built yet |
+| Android app: project, conversation list, history, error states | Done |
+| Android app: chat with product cards and table, debug screen | In progress |
 
 ## Quick start
 
@@ -97,6 +98,24 @@ uv run python try_tools.py recommend min_torque=500 torque_unit=nm service=on_of
 ```
 
 The database port on your machine is `5433`, so it does not clash with a local PostgreSQL. To use another one, change `POSTGRES_PORT` and `DATABASE_URL` in `.env`.
+
+## Android app
+
+A native app in Kotlin and Jetpack Compose, in `android/`. It needs Android Studio (or the Android SDK and JDK 17+), and the backend running.
+
+1. Start the backend: `docker compose up -d --build --wait`.
+2. Start an emulator from Android Studio's Device Manager.
+3. Open the `android/` folder in Android Studio and press Run, or from `android/`:
+
+```bash
+./gradlew installDebug
+```
+
+On Android 17 the app first asks for **local network access**: tap **Allow**. Android 17 blocks apps from private addresses such as `10.0.2.2` without it.
+
+**Backend URL.** The default is `http://10.0.2.2:8000`, which is how the emulator reaches your computer. For a phone, build with your computer's address, for example `./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000`. Or connect it by USB, run `adb reverse tcp:8000 tcp:8000` and use `-PbackendUrl=http://localhost:8000`, which needs no permission.
+
+**Tests:** `./gradlew testDebugUnitTest`, without an emulator or backend. One test reads a real backend response, so a renamed field fails a test instead of leaving an empty cell in the app.
 
 ## API
 
@@ -278,6 +297,7 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `--extract and --audit need the optional dependencies` | You left out `--group extract` | Use the command it prints |
 | `port is already allocated` | Port 5433 or 8000 is in use | Change `POSTGRES_PORT` and `DATABASE_URL`, or `BACKEND_PORT`, in `.env` |
 | `N problems, nothing was written` | A value failed validation, so the previous data was kept | See the [guide to correcting the data](docs/guia-de-correcciones.md) |
+| The app shows `Can't reach the server` while the backend is up | The app points to another address, or local network access was denied | Check `-PbackendUrl`, and allow Nearby devices for the app in Android Settings |
 | `There is no saved reading` | That audit model has not been run | Set `GOOGLE_API_KEY` in `.env` |
 
 ## Repository layout
@@ -292,4 +312,5 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `backend/Dockerfile` | The backend image, without the OCR dependencies |
 | `backend/tests/` | Tests |
 | `docs/` | The assessment, source PDFs and project guides |
+| `android/` | The Android app: `data/` talks to the backend, `ui/` has one folder per screen |
 | `.claude/` | AI assistant configuration, together with `CLAUDE.md` |

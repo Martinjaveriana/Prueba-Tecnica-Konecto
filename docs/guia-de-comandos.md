@@ -263,6 +263,65 @@ Dentro del emulador, `localhost` es el propio emulador, no tu computador. Tu com
 ~/Android/Sdk/platform-tools/adb shell '(printf "GET /health HTTP/1.0\r\n\r\n"; sleep 3) | nc 10.0.2.2 8000'
 ```
 
+## App Android
+
+Todos desde `android/`. Usan el Java que trae Android Studio; si `java -version` ya muestra 17 o más, puedes omitir `JAVA_HOME=...`.
+
+### Compilar y correr los tests
+
+```bash
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew assembleDebug testDebugUnitTest
+```
+
+La primera vez descarga Gradle y las dependencias (unos minutos). Los tests no necesitan emulador ni backend.
+
+### Instalar y abrir en el emulador
+
+Con el emulador y el backend arriba:
+
+```bash
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug
+```
+
+```bash
+~/Android/Sdk/platform-tools/adb shell am start -n com.series76.assistant/.MainActivity
+```
+
+En Android 17 la app pide primero el permiso de red local: hay que tocar **Allow**. Sin él no puede llegar a `10.0.2.2`.
+
+También se puede abrir la carpeta `android/` en Android Studio y pulsar ▶ Run.
+
+### Usar un celular
+
+Por cable, sin cambiar la URL ni pedir el permiso: `adb reverse` hace que `localhost` del celular sea tu computador.
+
+```bash
+~/Android/Sdk/platform-tools/adb reverse tcp:8000 tcp:8000
+```
+
+```bash
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug -PbackendUrl=http://localhost:8000
+```
+
+Por Wi-Fi, con la IP de tu computador en la red local (por ejemplo, `192.168.1.50`):
+
+```bash
+cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000
+```
+
+### Probar los estados de error
+
+| Prueba | Cómo | Qué debe verse |
+|---|---|---|
+| Backend caído al abrir | `docker compose stop backend` y abrir la app | "Can't reach the server" y **Retry** |
+| Backend caído con la lista cargada | Abrir una conversación, `docker compose stop backend` y volver | La lista sigue, con el aviso arriba |
+| Permiso denegado | Tocar **Don't allow** en el diálogo | Pantalla que explica el permiso, con **Allow** y **Open settings** |
+| Volver a pedir el permiso | El comando de abajo y abrir la app de nuevo | Aparece otra vez el diálogo |
+
+```bash
+~/Android/Sdk/platform-tools/adb shell pm revoke com.series76.assistant android.permission.ACCESS_LOCAL_NETWORK
+```
+
 ## Base de datos
 
 Estos comandos van desde la raíz del repo.

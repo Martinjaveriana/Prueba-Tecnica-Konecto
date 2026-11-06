@@ -1,0 +1,7 @@
+<!-- A valve handle turned 90 degrees: what a Series 76 actuator does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M54,34a20,20 0,1 1,0 40a20,20 0,1 1,0 -40zM54,42a12,12 0,1 0,0 24a12,12 0,1 0,0 -24z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M51,22h6v20h-6z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M66,51h20v6h-20z" />
+</vector>
