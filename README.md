@@ -112,7 +112,7 @@ The response of `POST /api/conversation`:
 | Field | Contents |
 |---|---|
 | `session_id`, `answer` | The fields the assessment fixes |
-| `products` | The models the tools returned, with every value from the tables. Each has a `role`: `specs`, `match`, `alternative`, `option`, `suggestion` or `no_data` |
+| `products` | The models the answer is about, always with the same fields (the `Product` schema in `/docs`), filled from the database. Each has a `role`: `specs`, `match`, `alternative`, `option`, `suggestion` or `no_data`. Alternatives add `differences`: why each one does not meet a requirement |
 | `needs_clarification` | `true` when the user must add information, such as a voltage or a torque unit |
 | `debug` | Tools called, their arguments and results, model, tokens, latency and the number check. For the debug screen; end users do not see it |
 
@@ -287,7 +287,7 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `backend/ingest.py` | The ingestion script |
 | `backend/ingestion/` | Its stages: structure, extract, build, load, audit |
 | `backend/data/` | Raw, corrected, processed and audit data |
-| `backend/app/` | API (`api.py`), agent (`agent.py`), number check (`numbers.py`), conversations, queries (`catalog.py`), tools and schema |
+| `backend/app/` | API (`api.py`), agent (`agent.py`), number check (`numbers.py`), product schema (`products.py`), conversations, queries (`catalog.py`), tools and schema |
 | `backend/eval_agent.py`, `backend/eval/` | Compares language models on the same questions, and the saved results |
 | `backend/Dockerfile` | The backend image, without the OCR dependencies |
 | `backend/tests/` | Tests |

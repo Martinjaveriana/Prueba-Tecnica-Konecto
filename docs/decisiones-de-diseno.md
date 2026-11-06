@@ -282,6 +282,8 @@ Usuario: ¿y cuánta potencia consume?
 | Agregar al historial los part numbers consultados, escritos por el código | El LLM sabe el modelo exacto aunque la respuesta haya dicho "el 2A", que son 3 modelos | Solo el texto: el LLM podría consultar el modelo equivocado o volver a preguntar |
 | Verificar con código los números de la respuesta | Las instrucciones al LLM no son una garantía. Un número que no aparece en lo que devolvieron las tools queda marcado en el debug | No revisar; o reintentar solo, que gasta presupuesto en falsos positivos como "te muestro 3 modelos" |
 | `products` sale de la salida de las tools | La app muestra números que salieron de la base, no del texto del LLM | Pedirle al LLM que arme la lista |
+| Cada producto tiene siempre los mismos campos (modelo `Product`), completados con la ficha del modelo en la base | Las tools no cambian: cada una le da al LLM lo que necesita (una ficha completa, o resúmenes cortos si `761A00` nombra 3 modelos). Pero la app recibe siempre lo mismo, venga de la tool que venga: con `761A00` puede comparar el torque de las 3 opciones aunque el LLM solo vio resúmenes. Y `/docs` muestra cada campo | Dejar `products` como diccionarios libres: la app tendría que adivinar qué campos vienen según la tool, y un cambio de nombre en `catalog.py` la rompería sin que fallara ningún test del backend; o hacer que todas las tools devuelvan fichas completas, que llena el contexto del LLM con datos que no pidió |
+| Los mensajes guardados antes de `Product` se completan al leerlos | Las conversaciones viejas se siguen abriendo en la app | Migrar la base o borrar las conversaciones viejas |
 | `debug` siempre en la respuesta; la app lo oculta | No contiene datos sensibles, y el historial también lo necesita | Activarlo con un parámetro: más complejidad sin beneficio, porque no hay login |
 | El backend crea las tablas y carga los datos al arrancar | Quien evalúa solo corre `docker compose up` | Pedir que corran `ingest.py` a mano |
 | Si la base no está, el backend arranca igual y reintenta en segundo plano (cada 2, 4, 8… hasta 30 s); mientras tanto responde 503 | La app recibe un 503 con un mensaje claro y se recupera sola cuando vuelve la base. Antes, el backend se caía a los 30 s y Docker lo reiniciaba en bucle: se vieron 102 reinicios con la base detenida | Caerse y dejar que Docker lo reinicie: ruido en `docker compose ps` y la API sin responder nada; o esperar sin límite antes de arrancar, que deja la API sin responder (conexión rechazada en vez de 503) |
@@ -296,6 +298,7 @@ Usuario: ¿y cuánta potencia consume?
 | Archivo | Qué hace |
 |---|---|
 | `backend/app/api.py` | Los endpoints. Al arrancar crea las tablas y carga los datos; si la base no está, reintenta en segundo plano y responde 503 mientras tanto |
+| `backend/app/products.py` | El modelo `Product`: le da a cada producto los mismos campos, desde la base, con su rol en la respuesta |
 | `backend/app/agent.py` | Las instrucciones del LLM, el historial con los part numbers, `products`, `needs_clarification` y el debug |
 | `backend/app/numbers.py` | El verificador de números. Entiende "2,3" y "2.3", y "4,800" y "4.800" |
 | `backend/app/conversations.py` | Guarda y lee las conversaciones; un turno se guarda en una sola transacción |

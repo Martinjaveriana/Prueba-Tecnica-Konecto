@@ -18,6 +18,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app import conversations
+from app.products import Product, readable
 from app.agent import build_chat_model, run_turn
 from app.config import BACKEND_DIR, settings
 from ingestion.load import load
@@ -96,7 +97,9 @@ class ConversationRequest(BaseModel):
 class ConversationResponse(BaseModel):
     session_id: UUID
     answer: str
-    products: list[dict[str, Any]] = Field(description="Models from the tools, each with its role in the answer.")
+    products: list[Product] = Field(
+        description="Models the answer is about, always with every field, built by code from the database."
+    )
     needs_clarification: bool = Field(description="True when the user must give more information.")
     debug: dict[str, Any] = Field(description="Tools called, their arguments and results. Hidden from end users.")
     message_id: int
@@ -123,7 +126,7 @@ class Message(BaseModel):
     id: int
     role: str
     content: str
-    products: list[dict[str, Any]]
+    products: list[Product]
     needs_clarification: bool
     debug: dict[str, Any] | None
     created_at: datetime
@@ -196,6 +199,8 @@ def session_messages(session_id: UUID) -> dict:
     session = conversations.get_session(session_id)
     if session is None:
         raise HTTPException(404, "Conversation not found.")
+    for message in session["messages"]:
+        message["products"] = readable(message["products"])
     return session
 
 

@@ -156,6 +156,12 @@ def _record(actuator: dict) -> dict:
     return {**actuator, "notes": _base_notes(actuator)}
 
 
+def records(part_numbers) -> dict[str, dict]:
+    """Full records of the given models, by part number."""
+    wanted = set(part_numbers)
+    return {a["part_number"]: _record(a) for a in _load_actuators() if a["part_number"] in wanted}
+
+
 def _summary(actuator: dict) -> dict:
     return {
         "part_number": actuator["part_number"],

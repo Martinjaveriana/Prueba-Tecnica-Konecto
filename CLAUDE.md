@@ -64,7 +64,7 @@ Los tests usan un LLM falso (`tests/fake_llm.py`) y no gastan presupuesto. No ha
 ## Estructura
 - `backend/`: Python 3.12 gestionado con `uv`. La configuración está en `app/config.py` y lee el `.env` de la raíz.
 - `backend/ingestion/`: la ingesta en etapas. `spec.py` declara la estructura de las 7 tablas, `extract.py` lee con Docling, `build.py` limpia y valida, `load.py` carga y `audit.py` compara con el modelo de visión.
-- `backend/app/api.py` (endpoints), `agent.py` (instrucciones, historial, `products`, debug), `numbers.py` (verificador de números), `conversations.py` (persistencia). El LLM solo elige tools y redacta: lo demás lo decide el código.
+- `backend/app/api.py` (endpoints), `agent.py` (instrucciones, historial, debug), `products.py` (modelo `Product`: los mismos campos para todo producto, completados desde la base), `numbers.py` (verificador de números), `conversations.py` (persistencia). El LLM solo elige tools y redacta: lo demás lo decide el código.
 - `backend/app/catalog.py`: las consultas y las reglas de búsqueda, sin LLM. `backend/app/tools.py` las expone como tools de LangChain; la lógica va en `catalog.py`.
 - `backend/data/`: `raw/` (lo que leyó Docling), `corrections.json` (correcciones registradas), `processed/actuators.json` (la fuente de la carga). Un valor mal leído se resuelve en `corrections.json`, nunca editando `processed/`.
 - `android/`: app en Kotlin + Jetpack Compose (aún no existe).

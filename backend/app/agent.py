@@ -16,6 +16,7 @@ from langchain_openai import ChatOpenAI
 
 from app.config import settings
 from app.numbers import unverified_numbers
+from app.products import complete, roles_from
 from app.tools import TOOLS
 
 SYSTEM_PROMPT = """You are the technical assistant for Series 76 electric actuators, used by plant engineers to look up
@@ -101,28 +102,6 @@ def history_messages(history: list[dict]) -> list[BaseMessage]:
     return messages
 
 
-def products_from(output: object) -> list[dict]:
-    """The models a tool result shows, each with its role in the answer."""
-    if not isinstance(output, dict):
-        return []
-    match output.get("status"):
-        case "found":
-            return [{"role": "specs", **output["actuator"]}]
-        case "no_data":
-            return [{"role": "no_data", **output["actuator"]}] + [
-                {"role": "alternative", **model} for model in output.get("alternatives", [])
-            ]
-        case "ambiguous":
-            return [{"role": "option", **model} for model in output["options"]]
-        case "not_found":
-            return [{"role": "suggestion", **model} for model in output["suggestions"]]
-        case "matches":
-            return [{"role": "match", **model} for model in output["matches"]]
-        case "no_matches":
-            return [{"role": "alternative", **model} for model in output["closest"]]
-    return []
-
-
 def _parse(content: str) -> object:
     try:
         return json.loads(content)
@@ -156,11 +135,14 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
     raw_answer = _text(final).strip() if final else ""
     answer = CONSULTED_LINE.sub("", raw_answer).strip() or EMPTY_ANSWER
 
-    products: list[dict] = []
+    found: list[dict] = []
     for call in tool_calls:
-        for product in products_from(call["output"]):
-            if all(p["part_number"] != product["part_number"] for p in products):
-                products.append(product)
+        for product in roles_from(call["output"]):
+            if all(p["part_number"] != product["part_number"] for p in found):
+                found.append(product)
+    # Only models the tools returned in full: those are what a follow-up question can refer to.
+    consulted = [p["part_number"] for p in found if "electrical_ratings" in p][:MAX_CONSULTED]
+    products = complete(found)
 
     # Only the last call to each tool counts: if the model corrected an argument in the same turn,
     # the first failed call no longer needs anything from the user.
@@ -181,8 +163,7 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         "unverified_numbers": unverified_numbers(
             answer, [call["output"] for call in tool_calls] + [query, SYSTEM_PROMPT]
         ),
-        # Only models with full data: those are what a follow-up question can refer to.
-        "part_numbers_consulted": [p["part_number"] for p in products if "electrical_ratings" in p][:MAX_CONSULTED],
+        "part_numbers_consulted": consulted,
         "input_tokens": sum(u.get("input_tokens", 0) for u in usage),
         "output_tokens": sum(u.get("output_tokens", 0) for u in usage),
         "latency_ms": round((time.monotonic() - started) * 1000),

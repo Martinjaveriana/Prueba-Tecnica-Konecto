@@ -6,7 +6,8 @@ from decimal import Decimal
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from app.agent import CONSULTED_PREFIX, EMPTY_ANSWER, history_messages, products_from, run_turn
+from app.agent import CONSULTED_PREFIX, EMPTY_ANSWER, history_messages, run_turn
+from app.products import roles_from
 from app.numbers import unverified_numbers
 from ingest import PROCESSED_PATH
 from ingestion.load import load
@@ -58,11 +59,11 @@ def test_numbers_from_the_question_are_allowed():
 
 def test_products_keep_the_role_of_each_model():
     output = {"status": "no_data", "actuator": {"part_number": "A"}, "alternatives": [{"part_number": "B"}]}
-    assert [(p["role"], p["part_number"]) for p in products_from(output)] == [("no_data", "A"), ("alternative", "B")]
+    assert [(p["role"], p["part_number"]) for p in roles_from(output)] == [("no_data", "A"), ("alternative", "B")]
 
 
 def test_a_text_result_has_no_products():
-    assert products_from("Invalid arguments: torque_unit is required") == []
+    assert roles_from("Invalid arguments: torque_unit is required") == []
 
 
 def test_a_lookup_returns_the_tool_data_as_products():
