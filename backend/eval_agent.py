@@ -11,6 +11,7 @@ import json
 import statistics
 import sys
 import time
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
 
@@ -123,6 +124,7 @@ def run_case(case: Case) -> dict:
         "passed": case.check(result) and not result.debug["empty_answer"] and result.debug["finish_reason"] != "length",
         "finish_reason": result.debug["finish_reason"],
         "marker_removed": result.debug["marker_removed"],
+        "markdown_table": result.debug["markdown_table"],
         "answer": result.answer,
         "tools": [{"name": c["name"], "args": c["args"]} for c in result.debug["tool_calls"]],
         "unverified_numbers": result.debug["unverified_numbers"],
@@ -151,6 +153,7 @@ def evaluate(model: str) -> dict:
         "unverified_numbers": sum(len(c.get("unverified_numbers", [])) for c in cases),
         "answers_cut": sum(c.get("finish_reason") == "length" for c in cases),
         "markers_removed": sum(bool(c.get("marker_removed")) for c in cases),
+        "markdown_tables": sum(bool(c.get("markdown_table")) for c in cases),
         "cost_usd": round(openrouter_usage() - spent_before, 5),
         "seconds": round(time.monotonic() - started),
         # Per question, as the app would wait for it. Questions with two turns add both; failed ones are left out.
@@ -162,6 +165,7 @@ def evaluate(model: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("models", nargs="+")
+    parser.add_argument("--out", type=Path, default=RESULTS_PATH, help="Where to save the details.")
     args = parser.parse_args()
     if not settings.has_openrouter_key():
         print("Set OPENROUTER_API_KEY in .env to compare models.")
@@ -173,15 +177,15 @@ def main() -> int:
         print(f"\n{model}")
         results.append(evaluate(model))
 
-    RESULTS_PATH.parent.mkdir(exist_ok=True)
-    RESULTS_PATH.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n{'model':32} passed  unverified  cut  markers  cost USD  median s  total s")
+    args.out.parent.mkdir(exist_ok=True)
+    args.out.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"\n{'model':32} passed  unverified  cut  markers  tables  cost USD  median s  total s")
     for r in results:
         print(
             f"{r['model']:32} {r['passed']:>2}/{r['total']}  {r['unverified_numbers']:>10}  {r['answers_cut']:>3}"
-            f"  {r['markers_removed']:>7}  {r['cost_usd']:>8}  {r['median_seconds']:>8}  {r['seconds']:>7}"
+            f"  {r['markers_removed']:>7}  {r['markdown_tables']:>6}  {r['cost_usd']:>8}  {r['median_seconds']:>8}  {r['seconds']:>7}"
         )
-    print(f"\nDetails -> {RESULTS_PATH}")
+    print(f"\nDetails -> {args.out}")
     return 0
 
 

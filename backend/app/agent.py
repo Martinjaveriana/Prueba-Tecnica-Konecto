@@ -31,8 +31,9 @@ Numbers
 - If the user gives a torque without a unit, ask for the unit before searching.
 
 How to answer
-- Be brief. The app shows every value of each model in a table, so mention only what was asked and what
+- Be brief. The app shows every value of each model in its own table, so mention only what was asked and what
   matters to decide.
+- Never write tables. Use short sentences or a short bullet list instead.
 - Always write full part numbers, such as 762A00-11300000/A.
 - Several models match a part number or alias: list them briefly and ask which voltage or service is meant.
 - A part number is not in the tables: say so plainly and offer the suggested ones as a question. Never assume.
@@ -61,6 +62,9 @@ Context
 CONSULTED_PREFIX = "[Part numbers consulted: "
 # Models imitate the marker they see in earlier answers. It is internal, so code removes it.
 CONSULTED_LINE = re.compile(r"\s*\[Part numbers consulted:[^\]]*\]")
+# Two or more lines like "| 763B00-11300000/A | 500 Nm |": a Markdown table, which the app shows as raw text
+# and which repeats the app's own table. Measured, not removed: removing it could drop the only copy of a value.
+TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$", re.MULTILINE)
 EMPTY_ANSWER = "I could not finish the answer. Please ask again."
 MAX_CONSULTED = 8
 CLARIFICATION_STATUSES = {"ambiguous", "not_found", "needs_requirements", "invalid"}
@@ -116,6 +120,10 @@ def _text(message: AIMessage) -> str:
     return "".join(block.get("text", "") for block in message.content if isinstance(block, dict))
 
 
+def has_markdown_table(text: str) -> bool:
+    return len(TABLE_ROW.findall(text)) >= 2
+
+
 def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None) -> TurnResult:
     started = time.monotonic()
     agent = create_agent(model or build_chat_model(), TOOLS, system_prompt=SYSTEM_PROMPT)
@@ -161,6 +169,7 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         "finish_reason": final.response_metadata.get("finish_reason") if final else None,
         "empty_answer": answer == EMPTY_ANSWER,
         "marker_removed": CONSULTED_PREFIX in raw_answer,
+        "markdown_table": has_markdown_table(answer),
         "unverified_numbers": unverified_numbers(
             answer, [call["output"] for call in tool_calls] + [query, SYSTEM_PROMPT]
         ),

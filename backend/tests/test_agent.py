@@ -187,3 +187,21 @@ def test_a_follow_up_reaches_the_model_with_the_exact_part_number():
     assert not any(isinstance(m, ToolMessage) for m in first_request)
     assert result.debug["unverified_numbers"] == []
     assert result.products[0]["motor_power_w"] == 40
+
+
+def test_a_markdown_table_in_the_answer_is_reported():
+    model = scripted(
+        call("get_actuator_specs", identifier="762A00-11300000/A"),
+        say("Here it is:\n\n| Part number | Torque |\n|---|---|\n| 762A00-11300000/A | 150 Nm |"),
+    )
+    assert run_turn("Torque of 762A00-11300000/A?", [], model).debug["markdown_table"] is True
+
+
+def test_a_single_pipe_is_not_a_table():
+    model = scripted(call("get_actuator_specs", identifier="762A00-11300000/A"), say("On/Off | Modulating: 150 | 130 Nm."))
+    assert run_turn("Torque of 762A00-11300000/A?", [], model).debug["markdown_table"] is False
+
+
+def test_the_instructions_forbid_tables():
+    from app.agent import SYSTEM_PROMPT
+    assert "Never write tables" in SYSTEM_PROMPT

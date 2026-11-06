@@ -176,6 +176,7 @@ Claude Haiku 5.5 passed every check in both runs, was the fastest, and costs abo
 The first run, with a limit of 1000 tokens, exposed three problems that were fixed before the final run:
 
 - **Cut answers:** GPT-5 mini and Qwen reason before answering, and with 1000 tokens some answers came out empty. The limit is now 3000, and a cut answer shows in `debug.finish_reason`.
+- **Markdown tables in the answers:** Haiku wrote tables in 3 of 14 answers, which the app showed as raw `|` text next to its own table. The instructions now say not to, and `debug.markdown_table` measures it. A rerun with Haiku alone kept 14/14 with 0 tables (`backend/eval/results-run3-no-tables.json`).
 - **An internal marker in the answers:** all three models copied the `[Part numbers consulted]` line into their answers, Haiku in 9 of 14. Code now removes it, and `debug.marker_removed` records when it did.
 - **Off-topic answers:** Haiku answered "Paris" before redirecting. The instructions now tell the model not to answer.
 

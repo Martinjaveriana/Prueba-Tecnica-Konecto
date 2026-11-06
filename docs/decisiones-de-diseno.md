@@ -345,8 +345,11 @@ Usuario: ¿y cuánta potencia consume?
 | Respuestas fuera de tema | Haiku respondió "Paris" antes de redirigir | Las instrucciones le dicen que no responda |
 | Mi script aprobaba respuestas vacías | Revisaba los productos, no el texto | Una respuesta vacía o cortada ahora reprueba |
 | Conversión de unidades por su cuenta | Qwen escribió 73.3 ft-lb, que no está en la tabla | Ninguno: el verificador lo marcó, que es justo para lo que existe |
+| Tablas Markdown dentro del texto (encontrado al probar la app) | Haiku escribió tablas en 3 de 14 respuestas; la app las mostraba con `\|` y repetían la tabla de la app | Regla en las instrucciones: "Never write tables", y `debug.markdown_table` lo mide. Se repitió la comparación solo con Haiku: 14/14, tablas de 3 a 0, sin números sin verificar y la misma mediana de 3.2 s |
 
-**Límites:** son 14 preguntas, una corrida por modelo. Alcanza para elegir entre tres candidatos, no es un estudio estadístico. Las dos corridas costaron USD 0.11 en total y están en `backend/eval/`.
+**Límites:** son 14 preguntas, una corrida por modelo. Alcanza para elegir entre tres candidatos, no es un estudio estadístico. Las dos corridas costaron USD 0.11 en total y están en `backend/eval/`. La tercera, solo Haiku y con la regla de las tablas, costó USD 0.013 (incluye una pregunta hecha a la vez desde la app) y está en `results-run3-no-tables.json`.
+
+**Por qué una regla en las instrucciones y no en la app:** dibujar tablas Markdown en la app dejaría dos tablas con los mismos datos; ocultarlas podría borrar la única copia de un dato, por ejemplo en "¿qué voltajes existen?", que no trae productos. Cambiar las instrucciones obliga a medir de nuevo, por eso se repitió la comparación.
 
 **Un detalle de transparencia:** el asistente con el que se construyó el proyecto también es un modelo de Anthropic. Por eso los criterios se fijaron antes de correr la comparación, y cada pregunta se califica con código.
 
