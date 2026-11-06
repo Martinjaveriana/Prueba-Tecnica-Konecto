@@ -285,9 +285,9 @@ Usuario: ¿y cuánta potencia consume?
 | `debug` siempre en la respuesta; la app lo oculta | No contiene datos sensibles, y el historial también lo necesita | Activarlo con un parámetro: más complejidad sin beneficio, porque no hay login |
 | El backend crea las tablas y carga los datos al arrancar | Quien evalúa solo corre `docker compose up` | Pedir que corran `ingest.py` a mano |
 | Un turno se guarda completo o no se guarda | Si el LLM falla, no quedan preguntas sin respuesta ni conversaciones vacías | Guardar la pregunta antes de responder |
-| `needs_clarification` lo decide el código | Es `true` si una tool respondió `ambiguous`, `not_found`, `needs_requirements` o rechazó un argumento, como un torque sin unidad | Pedirle al LLM que lo indique |
+| `needs_clarification` lo decide el código, con la última llamada a cada tool | Es `true` si esa llamada respondió `ambiguous`, `not_found`, `needs_requirements` o rechazó un argumento. Si el LLM corrige un argumento en el mismo turno, la llamada fallida ya no cuenta | Pedirle al LLM que lo indique; o contar cualquier llamada, que marcaba aclaración aunque el agente ya se hubiera corregido |
 | Un límite de 12 pasos por turno | Un modelo confundido no puede llamar tools sin fin y gastar presupuesto | Sin límite |
-| Validar la pregunta antes de revisar la clave | Una pregunta vacía es un error del cliente (422), no del servidor (503) | Revisar la clave primero: lo encontró una prueba con Docker |
+| Validar la pregunta antes de revisar la clave, quitando los espacios | Una pregunta vacía o de solo espacios es un error del cliente (422), y no debe gastar presupuesto | Revisar la clave primero, o aceptar "   ": los dos llegaban más lejos de lo debido |
 
 **Qué hace cada archivo:**
 
@@ -307,7 +307,10 @@ Usuario: ¿y cuánta potencia consume?
 | "Consume 40 W" | `motor_power_w: 40` | Verificado |
 | "Consume 2,3 A" | `fla_a: 2.3` | Verificado |
 | "Te muestro 3 modelos" | Nada con 3 | Se ignora: los números enteros hasta 10 suelen ser cantidades |
+| "Gira 90 grados en 18 s" | `speed_sec: 18` | Verificado: el 90 está en las instrucciones del agente, que también cuentan como fuente |
 | "Consume 45 W" | `motor_power_w: 40` | **Marcado** en `debug.unverified_numbers` |
+
+**Problemas que encontró una revisión externa, ya corregidos y con test:** un argumento corregido en el mismo turno seguía marcando `needs_clarification`; el verificador marcaba los 90 grados del giro; y una pregunta de solo espacios llegaba al LLM. También faltaba un test del seguimiento cuando el turno anterior mostró varios modelos, que funcionaba bien.
 
 **El modelo:** `openai/gpt-5-mini` es provisional. Se elegirá con `eval_agent.py`, que corre 14 preguntas con 3 candidatos. Cada una se califica con código a partir de lo que devolvieron las tools, y el script mide lo que realmente se gastó.
 

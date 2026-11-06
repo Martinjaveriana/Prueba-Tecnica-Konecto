@@ -155,17 +155,21 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
             if all(p["part_number"] != product["part_number"] for p in products):
                 products.append(product)
 
+    # Only the last call to each tool counts: if the model corrected an argument in the same turn,
+    # the first failed call no longer needs anything from the user.
+    last_calls = {call["name"]: call for call in tool_calls if call["output"] is not None}
     needs_clarification = any(
         isinstance(call["output"], str) or call["output"].get("status") in CLARIFICATION_STATUSES
-        for call in tool_calls
-        if call["output"] is not None
+        for call in last_calls.values()
     )
 
     usage = [m.usage_metadata for m in new_messages if isinstance(m, AIMessage) and m.usage_metadata]
     debug = {
         "model": settings.llm_model,
         "tool_calls": tool_calls,
-        "unverified_numbers": unverified_numbers(answer, [call["output"] for call in tool_calls] + [query]),
+        "unverified_numbers": unverified_numbers(
+            answer, [call["output"] for call in tool_calls] + [query, SYSTEM_PROMPT]
+        ),
         # Only models with full data: those are what a follow-up question can refer to.
         "part_numbers_consulted": [p["part_number"] for p in products if "electrical_ratings" in p][:MAX_CONSULTED],
         "input_tokens": sum(u.get("input_tokens", 0) for u in usage),

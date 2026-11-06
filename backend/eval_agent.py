@@ -8,6 +8,7 @@ returned, not by reading the answer by eye.
 
 import argparse
 import json
+import statistics
 import sys
 import time
 from dataclasses import dataclass
@@ -107,8 +108,10 @@ def openrouter_usage() -> float:
 def run_case(case: Case) -> dict:
     history: list[dict] = []
     result = None
+    latency_ms = 0
     for query in case.turns:
         result = run_turn(query, history, build_chat_model())
+        latency_ms += result.debug["latency_ms"]
         history += [
             {"role": "user", "content": query, "part_numbers": []},
             {"role": "assistant", "content": result.answer, "part_numbers": result.debug["part_numbers_consulted"]},
@@ -120,7 +123,7 @@ def run_case(case: Case) -> dict:
         "answer": result.answer,
         "tools": [{"name": c["name"], "args": c["args"]} for c in result.debug["tool_calls"]],
         "unverified_numbers": result.debug["unverified_numbers"],
-        "latency_ms": result.debug["latency_ms"],
+        "latency_ms": latency_ms,
     }
 
 
@@ -145,6 +148,8 @@ def evaluate(model: str) -> dict:
         "unverified_numbers": sum(len(c.get("unverified_numbers", [])) for c in cases),
         "cost_usd": round(openrouter_usage() - spent_before, 5),
         "seconds": round(time.monotonic() - started),
+        # Per question, as the app would wait for it. Questions with two turns add both; failed ones are left out.
+        "median_seconds": round(statistics.median([c["latency_ms"] for c in cases if "latency_ms" in c] or [0]) / 1000, 1),
         "cases": cases,
     }
 
@@ -164,9 +169,12 @@ def main() -> int:
 
     RESULTS_PATH.parent.mkdir(exist_ok=True)
     RESULTS_PATH.write_text(json.dumps(results, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"\n{'model':40} passed  unverified  cost USD  seconds")
+    print(f"\n{'model':40} passed  unverified  cost USD  median s  total s")
     for r in results:
-        print(f"{r['model']:40} {r['passed']:>2}/{r['total']}  {r['unverified_numbers']:>10}  {r['cost_usd']:>8}  {r['seconds']:>7}")
+        print(
+            f"{r['model']:40} {r['passed']:>2}/{r['total']}  {r['unverified_numbers']:>10}  {r['cost_usd']:>8}"
+            f"  {r['median_seconds']:>8}  {r['seconds']:>7}"
+        )
     print(f"\nDetails -> {RESULTS_PATH}")
     return 0
 

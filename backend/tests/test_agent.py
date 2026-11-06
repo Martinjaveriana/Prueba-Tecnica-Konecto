@@ -41,6 +41,14 @@ def test_an_invented_number_is_reported():
     assert unverified_numbers("It draws 45 W and 2.7 A.", [{"motor_power_w": 40, "fla_a": 2.3}]) == ["45", "2.7"]
 
 
+def test_numbers_from_the_instructions_are_allowed():
+    model = scripted(
+        call("get_actuator_specs", identifier="762A00-11300000/A"),
+        say("It takes 18 seconds for a 90 degree turn, with a 50% duty cycle in On/Off."),
+    )
+    assert run_turn("Speed of 762A00-11300000/A?", [], model).debug["unverified_numbers"] == []
+
+
 def test_numbers_from_the_question_are_allowed():
     assert unverified_numbers("You asked for 500 Nm.", ["I need 500 Nm"]) == []
 
@@ -86,6 +94,27 @@ def test_an_invalid_argument_needs_clarification():
     assert "torque_unit is required" in result.debug["tool_calls"][0]["output"]
 
 
+def test_a_corrected_argument_in_the_same_turn_needs_no_clarification():
+    model = scripted(
+        call("recommend_actuators", "c1", min_torque=500),
+        call("recommend_actuators", "c2", min_torque=500, torque_unit="nm", service="on_off", voltage_v=110, enclosure="weatherproof"),
+        say("The 763B00-11300000/A gives 500 Nm."),
+    )
+    result = run_turn("I need 500 Nm, On/Off, weatherproof, 110 V", [], model)
+    assert len(result.debug["tool_calls"]) == 2
+    assert result.needs_clarification is False
+    assert result.products[0]["part_number"] == "763B00-11300000/A"
+
+
+def test_a_clarification_still_pending_at_the_end_is_reported():
+    model = scripted(
+        call("recommend_actuators", "c1", min_torque=500, torque_unit="nm", voltage_v=110),
+        call("get_actuator_specs", "c2", identifier="1A"),
+        say("Here are some options. Which 1A do you mean?"),
+    )
+    assert run_turn("500 Nm at 110 V, and what about the 1A?", [], model).needs_clarification is True
+
+
 def test_an_answer_with_no_tool_has_no_products():
     result = run_turn("What is the weather?", [], scripted(say("I can only help with Series 76 actuators.")))
     assert result.products == []
@@ -109,6 +138,21 @@ def test_history_carries_text_and_consulted_part_numbers_but_no_old_data():
     assert isinstance(messages[0], HumanMessage)
     assert messages[1].content == f"On/Off gives 150 Nm.\n{CONSULTED_PREFIX}762A00-11300000/A]"
     assert not any(isinstance(m, ToolMessage) for m in messages)
+
+
+def test_a_follow_up_after_several_models_lists_them_in_order():
+    model = scripted(
+        call("recommend_actuators", min_torque=500, torque_unit="nm", service="on_off", voltage_v=110, enclosure="weatherproof", limit=2),
+        say("Two models qualify."),
+    )
+    result = run_turn("On/Off, 110 V, weatherproof, 500 Nm", [], model)
+    assert result.debug["part_numbers_consulted"] == ["763B00-11300000/A", "763C00-11300000/A"]
+
+    history = [
+        {"role": "user", "content": "On/Off, 110 V, weatherproof, 500 Nm", "part_numbers": []},
+        {"role": "assistant", "content": result.answer, "part_numbers": result.debug["part_numbers_consulted"]},
+    ]
+    assert history_messages(history)[1].content.endswith(f"{CONSULTED_PREFIX}763B00-11300000/A, 763C00-11300000/A]")
 
 
 def test_a_follow_up_reaches_the_model_with_the_exact_part_number():

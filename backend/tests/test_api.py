@@ -98,7 +98,9 @@ def test_an_unknown_conversation_is_not_found():
         assert client.get(f"/api/sessions/{uuid4()}/messages").status_code == 404
 
 
-@pytest.mark.parametrize("body", [{"query": ""}, {}, {"query": "Hi", "session_id": "not-a-uuid"}])
+@pytest.mark.parametrize(
+    "body", [{"query": ""}, {"query": "   "}, {"query": "\n\t"}, {}, {"query": "Hi", "session_id": "not-a-uuid"}]
+)
 def test_invalid_requests_are_rejected(body):
     with client_with(say("unused")) as client:
         assert client.post("/api/conversation", json=body).status_code == 422

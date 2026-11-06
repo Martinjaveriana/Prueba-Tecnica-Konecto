@@ -6,7 +6,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
 import openai
@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_core.language_models import BaseChatModel
 from langgraph.errors import GraphRecursionError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app import conversations
 from app.agent import build_chat_model, run_turn
@@ -59,7 +59,10 @@ app = FastAPI(
 
 class ConversationRequest(BaseModel):
     session_id: UUID | None = Field(None, description="Leave out to start a new conversation.")
-    query: str = Field(..., min_length=1, max_length=2000, description="The user's question.")
+    # Spaces are stripped first, so a blank question is rejected before it spends budget.
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)] = Field(
+        ..., description="The user's question."
+    )
 
 
 class ConversationResponse(BaseModel):
