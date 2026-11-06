@@ -21,6 +21,7 @@ Parten de que ya hiciste la preparación inicial, más abajo.
 
 | Quiero... | Pasos |
 |---|---|
+| **Probar que el backend funciona** | [Probar el backend paso a paso](#probar-el-backend-paso-a-paso) |
 | **Levantar todo y conversar con el agente** | [Levantar el backend con Docker](#levantar-el-backend-con-docker) y [preguntar](#preguntar-desde-la-terminal) |
 | Trabajar en el código del backend | [Levantar la base](#levantar-la-base), [cargar los datos](#cargar-los-datos) y [correr la API sin Docker](#correr-la-api-sin-docker) |
 | Tener los datos en la base | [Levantar la base](#levantar-la-base) y [cargar los datos](#cargar-los-datos) |
@@ -93,6 +94,121 @@ Desde `backend/`. Gasta de la clave de OpenRouter, unos centavos por modelo. Cor
 
 ```bash
 uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
+```
+
+## Probar el backend paso a paso
+
+Desde la raíz del repo, con `OPENROUTER_API_KEY`, `LLM_MODEL=anthropic/claude-haiku-5.5` y `LLM_MAX_TOKENS=3000` en `.env`. Cada pregunta gasta unos USD 0.0007.
+
+### 1. Levantar y revisar que esté sano
+
+```bash
+docker compose up -d --build --wait
+```
+
+```bash
+curl -s http://localhost:8000/health
+```
+
+Debe decir `"status": "ok"` y `"language_model_configured": true`.
+
+### 2. Preguntar desde el navegador
+
+Abre <http://localhost:8000/docs>, entra a `POST /api/conversation` y pulsa **Try it out**. El cuadro ya trae una pregunta lista; pulsa **Execute**, o cámbiala por otra:
+
+```json
+{ "query": "What is the output torque of 762A00-11300000/A?" }
+```
+
+Para seguir la conversación, copia el `session_id` de la respuesta y agrégalo a la siguiente pregunta:
+
+```json
+{ "session_id": "PEGALO-AQUI", "query": "And how much power does it draw?" }
+```
+
+Si responde `404 Conversation not found`, el `session_id` no existe en tu base: usa uno que haya devuelto una respuesta anterior, o quítalo para empezar una conversación nueva.
+
+### 3. O desde la terminal
+
+`jq` ordena la salida; si no lo tienes, cambia `jq` por `python3 -m json.tool`.
+
+Una pregunta, mostrando solo la respuesta y las tools llamadas:
+
+```bash
+curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "What is the output torque of 762A00-11300000/A?"}' | jq '{answer, needs_clarification, tools: [.debug.tool_calls[] | {name, args}]}'
+```
+
+Una pregunta y su seguimiento, en una sola línea:
+
+```bash
+SID=$(curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "What torque does the 2A give at 110 V?"}' | jq -r .session_id) && curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d "{\"session_id\": \"$SID\", \"query\": \"And how much power does it draw?\"}" | jq '{answer, tools: [.debug.tool_calls[] | {name, args}]}'
+```
+
+En el seguimiento, la tool debe recibir `762A00-11300000/A` completo, no "2A".
+
+### 4. Preguntas para probar los casos difíciles
+
+Usa cada una en una conversación nueva, sin `session_id`:
+
+| Pregunta | Qué debería pasar |
+|---|---|
+| `What is the output torque of 762A00-11300000/A?` | 150 Nm en On/Off y 130 Nm en Modulating |
+| `Tell me about the 1A` | Muestra 3 opciones o pregunta el voltaje; `needs_clarification: true` |
+| `Specs for 761800-11300000/A` | Dice que no existe y sugiere `761B00-11300000/A` |
+| `Give me the data of 761A00-11380000/A` | Dice que no está en las tablas, aunque aparece en el summary |
+| `What is the torque of 761A00-11330C00/A?` | Dice que la tabla lo lista como N/A y ofrece alternativas |
+| `Recommend an On/Off weatherproof actuator at 110 V with at least 500 Nm` | Empieza por `763B00-11300000/A` |
+| `I need an explosionproof, 3-phase actuator with at least 400 Nm` | Dice que ninguno cumple y ofrece `763Y30`, aclarando que es de 1 fase |
+| `Necesito un actuador modulating de 3 fases con al menos 400 Nm` | Ofrece `763B00-11330C00/A` y avisa que la tabla no indica el modo |
+| `I need an actuator with 500 of torque` | Pregunta la unidad |
+| `I need 70 ft-lb, On/Off, weatherproof, 110 V` | Empieza por `761B00-11300000/A` |
+| `What is the capital of France?` | No responde la pregunta y redirige |
+| `And how much power does it draw?` | Pregunta de qué modelo se habla |
+
+### 5. Qué revisar en `debug`
+
+| Campo | Qué debería tener |
+|---|---|
+| `tool_calls` | Las tools llamadas, con sus argumentos y lo que devolvieron |
+| `unverified_numbers` | `[]`: si aparece un número, el agente dijo algo que no salió de las tools |
+| `finish_reason` | No debe ser `length`, que significa respuesta cortada |
+| `part_numbers_consulted` | Los modelos que el siguiente turno podrá usar |
+| `input_tokens`, `output_tokens`, `latency_ms` | Consumo y tiempo de esa pregunta |
+
+### 6. Comprobar que las conversaciones se guardan
+
+Lista las conversaciones:
+
+```bash
+curl -s http://localhost:8000/api/sessions | jq
+```
+
+Reinicia el backend:
+
+```bash
+docker compose restart backend
+```
+
+Vuelve a listarlas cuando arranque: deben seguir ahí. Para ver una completa, con productos y debug:
+
+```bash
+curl -s http://localhost:8000/api/sessions/PEGALO-AQUI/messages | jq
+```
+
+### 7. Comprobar los errores
+
+| Prueba | Comando | Respuesta esperada |
+|---|---|---|
+| Conversación inexistente | `curl -s http://localhost:8000/api/sessions/00000000-0000-0000-0000-000000000000/messages` | 404 |
+| Pregunta vacía | `curl -s -X POST http://localhost:8000/api/conversation -H "Content-Type: application/json" -d '{"query": "   "}'` | 422, sin gastar |
+| Base apagada | `docker compose stop db` y luego `curl -s http://localhost:8000/health` | 503 con un mensaje claro |
+
+Después de la última prueba, vuelve a levantar la base con `docker compose start db`. El backend se recupera solo.
+
+### 8. Ver qué pasa por dentro
+
+```bash
+docker compose logs -f backend
 ```
 
 ## Base de datos

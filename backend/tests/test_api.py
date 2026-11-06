@@ -147,6 +147,13 @@ def test_without_a_key_an_invalid_request_is_still_reported_as_invalid(monkeypat
         assert client.post("/api/conversation", json={"query": ""}).status_code == 422
 
 
+def test_the_example_in_the_docs_starts_a_new_conversation():
+    # Pressing Execute in /docs must work: the example cannot carry a made-up session_id.
+    with TestClient(app) as client:
+        schema = client.get("/openapi.json").json()["components"]["schemas"]["ConversationRequest"]
+    assert schema["examples"] == [{"query": "What is the output torque of 762A00-11300000/A?"}]
+
+
 def test_health_reports_the_database_and_the_key():
     with TestClient(app) as client:
         body = client.get("/health").json()

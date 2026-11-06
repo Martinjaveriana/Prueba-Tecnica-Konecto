@@ -15,7 +15,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from langchain_core.language_models import BaseChatModel
 from langgraph.errors import GraphRecursionError
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app import conversations
 from app.agent import build_chat_model, run_turn
@@ -58,7 +58,14 @@ app = FastAPI(
 
 
 class ConversationRequest(BaseModel):
-    session_id: UUID | None = Field(None, description="Leave out to start a new conversation.")
+    # The example in /docs must work as is: a made-up session_id would answer 404.
+    model_config = ConfigDict(
+        json_schema_extra={"examples": [{"query": "What is the output torque of 762A00-11300000/A?"}]}
+    )
+
+    session_id: UUID | None = Field(
+        None, description="Leave out to start a new conversation. To continue one, use the session_id it returned."
+    )
     # Spaces are stripped first, so a blank question is rejected before it spends budget.
     query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)] = Field(
         ..., description="The user's question."
@@ -73,6 +80,14 @@ class ConversationResponse(BaseModel):
     debug: dict[str, Any] = Field(description="Tools called, their arguments and results. Hidden from end users.")
     message_id: int
     created_at: datetime
+
+
+class ErrorResponse(BaseModel):
+    detail: str
+
+
+NOT_FOUND = {404: {"model": ErrorResponse, "description": "The conversation does not exist."}}
+UNAVAILABLE = {503: {"model": ErrorResponse, "description": "The language model or the database is not available."}}
 
 
 class SessionSummary(BaseModel):
@@ -112,7 +127,7 @@ def database_unavailable(request: Request, error: psycopg.OperationalError) -> J
     return JSONResponse(status_code=503, content={"detail": "The database is not available. Try again in a moment."})
 
 
-@app.post("/api/conversation", response_model=ConversationResponse)
+@app.post("/api/conversation", response_model=ConversationResponse, responses={**NOT_FOUND, **UNAVAILABLE})
 def converse(request: ConversationRequest, model: BaseChatModel | None = Depends(get_chat_model)) -> dict:
     """Ask a question. Without session_id a new conversation starts and its id is returned."""
     if model is None:
@@ -145,13 +160,13 @@ def converse(request: ConversationRequest, model: BaseChatModel | None = Depends
     }
 
 
-@app.get("/api/sessions", response_model=list[SessionSummary])
+@app.get("/api/sessions", response_model=list[SessionSummary], responses=UNAVAILABLE)
 def sessions() -> list[dict]:
     """Saved conversations, most recent first."""
     return conversations.list_sessions()
 
 
-@app.get("/api/sessions/{session_id}/messages", response_model=SessionDetail)
+@app.get("/api/sessions/{session_id}/messages", response_model=SessionDetail, responses={**NOT_FOUND, **UNAVAILABLE})
 def session_messages(session_id: UUID) -> dict:
     """A conversation with its messages, to resume it."""
     session = conversations.get_session(session_id)
