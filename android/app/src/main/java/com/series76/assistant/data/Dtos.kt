@@ -19,6 +19,7 @@ data class ConversationResponse(
     val answer: String,
     val products: List<Product>,
     @SerialName("needs_clarification") val needsClarification: Boolean,
+    val focus: Focus = Focus(),
     val debug: JsonObject,
     @SerialName("message_id") val messageId: Long,
     @SerialName("created_at") val createdAt: String,
@@ -49,6 +50,7 @@ data class Message(
     val content: String,
     val products: List<Product>,
     @SerialName("needs_clarification") val needsClarification: Boolean,
+    val focus: Focus = Focus(),
     // Tools called, their arguments and results. Only the debug screen reads it.
     val debug: JsonObject? = null,
     @SerialName("created_at") val createdAt: String,
@@ -104,6 +106,13 @@ data class Difference(
     val actual: JsonElement? = null,
     @SerialName("requested_unit") val requestedUnit: String? = null,
     @SerialName("table_unit") val tableUnit: String? = null,
+)
+
+/** The service and frequency the question was about. null: the user did not say. */
+@Serializable
+data class Focus(
+    val service: String? = null,
+    @SerialName("frequency_hz") val frequencyHz: Int? = null,
 )
 
 @Serializable

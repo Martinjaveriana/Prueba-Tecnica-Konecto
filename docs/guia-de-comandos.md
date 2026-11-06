@@ -309,6 +309,20 @@ Por Wi-Fi, con la IP de tu computador en la red local (por ejemplo, `192.168.1.5
 cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000
 ```
 
+### Preguntas para probar el chat
+
+Cada una prueba una vista distinta. Gastan de la clave (unos USD 0.0007 cada una con Haiku).
+
+| Pregunta | Qué debe verse |
+|---|---|
+| `What is the torque of 762A00-11300000/A?` | Una tarjeta con On/Off y Modulating, 60 y 50 Hz |
+| Luego `And how much power does it draw?` | Responde 40 W sin repetir el part number |
+| `What about the 1A?` | Tres opciones para tocar; una dice que no tiene valores |
+| `I need at least 500 Nm, On/Off, 110 V` | Tabla comparativa abierta en On/Off y 60 Hz |
+| `I need 3000 Nm modulating at 24 V` | "Ninguno cumple", tabla de alternativas y diferencias en rojo |
+| `Which 3 phase actuators give at least 400 Nm modulating?` | Tabla abierta en Modulating, valores con `*` |
+| `761A00-11330C00/A` | Tarjeta N/A sin valores y modelos con datos para mirar |
+
 ### Probar los estados de error
 
 | Prueba | Cómo | Qué debe verse |
@@ -316,6 +330,7 @@ cd android && JAVA_HOME=~/android-studio/jbr ./gradlew installDebug -PbackendUrl
 | Backend caído al abrir | `docker compose stop backend` y abrir la app | "Can't reach the server" y **Retry** |
 | Backend caído con la lista cargada | Abrir una conversación, `docker compose stop backend` y volver | La lista sigue, con el aviso arriba |
 | Permiso denegado | Tocar **Don't allow** en el diálogo | Pantalla que explica el permiso, con **Allow** y **Open settings** |
+| Pregunta con el backend caído | `docker compose stop backend`, enviar, `docker compose start backend` y **Retry** | "Not sent" y luego la respuesta, sin duplicar la pregunta |
 | Volver a pedir el permiso | El comando de abajo y abrir la app de nuevo | Aparece otra vez el diálogo |
 
 ```bash

@@ -10,8 +10,8 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 | Agent tools, tested without an LLM | Done |
 | Agent, REST API and conversation history | Done |
 | Backend `Dockerfile` | Done |
-| Android app: project, conversation list, history, error states | Done |
-| Android app: chat with product cards and table, debug screen | In progress |
+| Android app: conversation list, chat, product cards and comparison table, error states | Done |
+| Android app: debug screen | In progress |
 
 ## Quick start
 
@@ -114,6 +114,8 @@ A native app in Kotlin and Jetpack Compose, in `android/`. It needs Android Stud
 On Android 17 the app first asks for **local network access**: tap **Allow**. Android 17 blocks apps from private addresses such as `10.0.2.2` without it.
 
 **Backend URL.** The default is `http://10.0.2.2:8000`, which is how the emulator reaches your computer. For a phone, build with your computer's address, for example `./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000`. Or connect it by USB, run `adb reverse tcp:8000 tcp:8000` and use `-PbackendUrl=http://localhost:8000`, which needs no permission.
+
+**What the chat shows.** The answer text explains; the numbers are in cards and tables built from `products`, so they come from the database, not from the model's text. One model is a card; several matches or alternatives are a comparison table with a service and frequency selector, which opens on what the user asked for (`focus`); several models for a partial part number are a list to tap. 3-phase ratings that the PDF does not assign to a service are marked `*`, and 24 V ratings that do not depend on the frequency `†`. A question that fails stays on screen with **Retry**; retrying does not duplicate it, because the backend saves a turn whole or not at all.
 
 **Tests:** `./gradlew testDebugUnitTest`, without an emulator or backend. One test reads a real backend response, so a renamed field fails a test instead of leaving an empty cell in the app.
 

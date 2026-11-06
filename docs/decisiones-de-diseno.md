@@ -393,6 +393,52 @@ Pantalla ──> ViewModel ──> ConversationRepository ──> Retrofit ─�
 | `ui/chat/` | Por ahora, el historial de una conversación; en la 4b, el chat completo |
 | `ui/common/LocalNetworkGate.kt` | Pide el permiso de red local en Android 17 antes de mostrar la app |
 
+### App Android (Fase 4b: el chat)
+
+**Cómo fluye una pregunta:** al enviar "Torque of the 2A at 110 V?", el ViewModel agrega la pregunta a la lista, bloquea el campo y muestra "Looking up the tables…". Cuando el backend responde, guarda el `session_id` (si era una conversación nueva) y agrega la respuesta con sus `products` y su `focus`. Si falla, la pregunta queda marcada "Not sent" con **Retry**.
+
+```
+send("Torque of the 2A?") ─> [pregunta][esperando…] ─> repository.ask(session_id, texto)
+                                                         ├─ 200: [pregunta][respuesta + productos], guarda session_id
+                                                         └─ error: [pregunta ✗ Not sent · Retry]
+```
+
+| Decisión | Por qué | Descartado |
+|---|---|---|
+| La pregunta aparece antes de que responda el backend | Se siente inmediato; una respuesta tarda de 3 a 10 s | Esperar la respuesta para mostrar las dos |
+| Una pregunta a la vez: el campo se bloquea mientras se espera | Dos preguntas en paralelo podrían guardarse desordenadas en el historial | Permitir varias |
+| Si falla, la pregunta queda con Retry; reintentar no duplica | El backend guarda el turno completo o nada, así que reenviar es seguro. Probado: tras un Retry la conversación tiene 2 mensajes, no 3 | Borrar la pregunta y mostrar un error |
+| Si el usuario pregunta otra cosa, la pregunta no enviada se descarta | Nunca llegó al backend, así que no es parte de la conversación | Dejarla en la lista |
+| Cada `role` tiene su vista: tarjeta (`specs`, `no_data`, un solo `match`), tabla (varios `match` o `alternative`), lista para tocar (`option`, `suggestion`) | El usuario compara modelos en una tabla y elige entre opciones con un toque | Un solo formato para todo |
+| Tocar una opción la envía como pregunta | Resolver "¿cuál 1A?" toma un toque | Escribir el part number |
+| La tabla comparativa tiene un selector de servicio y frecuencia | Cada modelo tiene valores por servicio y por frecuencia; con el selector se comparan en las mismas condiciones | Mostrar las 4 combinaciones por dato |
+| La tabla abre en `focus` (lo que pidió el usuario); sin `focus`, en On/Off y 60 Hz | Si pediste Modulating, la tabla no abre en On/Off | Que la app adivine |
+| Los valores de 3 fases llevan `*` y los de 24 V `†`, con su nota debajo | Un valor que la tabla no asigna a un servicio, o que no depende de la frecuencia, se ve distinto | Mostrarlos como cualquier otro |
+| Las celdas muestran el número tal como viene de la base, con su unidad; sin dato, "—" | Lo que ves coincide con el PDF; un 0 se confundiría con un valor real | Redondear, convertir o poner 0 |
+| La app muestra solo negritas, viñetas y títulos del Markdown, con unas 30 líneas propias | El agente los usa; una librería sería mucho para tan poco, y cambiar las instrucciones obligaría a repetir la comparación de modelos | Librería de Markdown, o pedirle al LLM texto plano |
+| Las etiquetas de la tabla y los formatos están en funciones sin Compose (`ProductFormat.kt`, `Comparison.kt`) | Se prueban en la JVM, sin emulador | Escribirlos dentro de las pantallas |
+| Desplazamiento sin animación a la pregunta y luego al inicio de la respuesta | Con animación, el desplazamiento empezaba antes de medir una respuesta larga y quedaba corto | `animateScrollToItem` |
+
+**Errores encontrados al probar con preguntas reales** (cada uno corregido):
+
+| Problema | Causa | Arreglo |
+|---|---|---|
+| La respuesta quedaba cortada abajo | La animación empezaba antes de medir la respuesta | Desplazamiento sin animación |
+| Al llegar la respuesta la lista no bajaba | La respuesta reemplaza al indicador de espera y la cantidad de elementos no cambia | Reaccionar a la lista de mensajes y al estado de espera |
+| Modulating aparecía antes que On/Off | La base los ordena alfabéticamente | La tarjeta ordena On/Off, Modulating, sin especificar |
+| Las alternativas a un modelo N/A decían "ninguno cumple" | El rol `alternative` se usa en dos casos | Otro título cuando acompañan a un modelo `no_data` |
+
+**Qué hace cada archivo** (en `ui/chat/`):
+
+| Archivo | Qué hace |
+|---|---|
+| `ChatViewModel.kt` | Enviar, reintentar, guardar el `session_id` |
+| `ChatScreen.kt` | Burbujas, indicador de espera, ejemplos para empezar y campo de texto |
+| `Markdown.kt` | Negritas, viñetas y títulos |
+| `products/Comparison.kt` | Agrupar por rol, elegir servicio y frecuencia, armar las filas de la tabla |
+| `products/ProductFormat.kt` | Nombres, unidades y el texto de cada diferencia |
+| `products/ProductCard.kt`, `ComparisonTable.kt`, `ChoiceList.kt`, `ProductsView.kt` | Las vistas de los productos |
+
 ### Proyecto
 
 | Decisión | Por qué | Descartado |
