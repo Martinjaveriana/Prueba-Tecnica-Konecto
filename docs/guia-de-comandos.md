@@ -323,6 +323,24 @@ Cada una prueba una vista distinta. Gastan de la clave (unos USD 0.0007 cada una
 | `Which 3 phase actuators give at least 400 Nm modulating?` | Tabla abierta en Modulating, valores con `*` |
 | `761A00-11330C00/A` | Tarjeta N/A sin valores y modelos con datos para mirar |
 
+### Abrir la pantalla de debug
+
+1. En la lista, **mantener "New conversation" 3 segundos** y confirmar **Enter**. Aparece "Debug mode" en rojo arriba.
+2. En un chat, **pulsación larga sobre una respuesta**.
+3. Para apagarlo: mantener otra vez el botón y elegir **Leave**.
+
+Desde la terminal, con el emulador (las coordenadas son las del emulador `Medium_Phone`):
+
+```bash
+~/Android/Sdk/platform-tools/adb shell input swipe 795 2221 795 2221 3500
+```
+
+Para ver si el modo quedó guardado:
+
+```bash
+~/Android/Sdk/platform-tools/adb shell run-as com.series76.assistant cat shared_prefs/developer.xml
+```
+
 ### Probar los estados de error
 
 | Prueba | Cómo | Qué debe verse |

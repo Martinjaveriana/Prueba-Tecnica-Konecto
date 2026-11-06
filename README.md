@@ -10,8 +10,7 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 | Agent tools, tested without an LLM | Done |
 | Agent, REST API and conversation history | Done |
 | Backend `Dockerfile` | Done |
-| Android app: conversation list, chat, product cards and comparison table, error states | Done |
-| Android app: debug screen | In progress |
+| Android app: conversations, chat with product cards and comparison table, debug screen, error states | Done |
 
 ## Quick start
 
@@ -101,23 +100,87 @@ The database port on your machine is `5433`, so it does not clash with a local P
 
 ## Android app
 
-A native app in Kotlin and Jetpack Compose, in `android/`. It needs Android Studio (or the Android SDK and JDK 17+), and the backend running.
+A native app in Kotlin and Jetpack Compose, in `android/`, with three screens: the saved conversations, the chat, and a hidden debug screen.
 
-1. Start the backend: `docker compose up -d --build --wait`.
-2. Start an emulator from Android Studio's Device Manager.
+<p>
+<img src="docs/screenshots/chat-card.png" width="200" alt="Chat with a product card">
+<img src="docs/screenshots/comparison-table.png" width="200" alt="Comparison table opened on Modulating">
+<img src="docs/screenshots/alternatives.png" width="200" alt="Closest options when nothing qualifies">
+<img src="docs/screenshots/debug.png" width="200" alt="Debug screen">
+</p>
+
+### Run it
+
+You need Android Studio (or the Android SDK and JDK 17+) and the backend running.
+
+1. Start the backend from the repository root: `docker compose up -d --build --wait`.
+2. Start an emulator from Android Studio's Device Manager. The app was built and tested on Android 17 (API 37); it runs on Android 8 (API 26) and later.
 3. Open the `android/` folder in Android Studio and press Run, or from `android/`:
 
 ```bash
 ./gradlew installDebug
 ```
 
-On Android 17 the app first asks for **local network access**: tap **Allow**. Android 17 blocks apps from private addresses such as `10.0.2.2` without it.
+4. On Android 17 the app first asks for **local network access**: tap **Allow**. Android 17 blocks apps from private addresses such as `10.0.2.2` without it, and the connection hangs instead of failing. If you denied it, the app explains why it needs it and links to Settings.
 
-**Backend URL.** The default is `http://10.0.2.2:8000`, which is how the emulator reaches your computer. For a phone, build with your computer's address, for example `./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000`. Or connect it by USB, run `adb reverse tcp:8000 tcp:8000` and use `-PbackendUrl=http://localhost:8000`, which needs no permission.
+### Point it to the backend
 
-**What the chat shows.** The answer text explains; the numbers are in cards and tables built from `products`, so they come from the database, not from the model's text. One model is a card; several matches or alternatives are a comparison table with a service and frequency selector, which opens on what the user asked for (`focus`); several models for a partial part number are a list to tap. 3-phase ratings that the PDF does not assign to a service are marked `*`, and 24 V ratings that do not depend on the frequency `†`. A question that fails stays on screen with **Retry**; retrying does not duplicate it, because the backend saves a turn whole or not at all.
+| Device | How |
+|---|---|
+| Emulator | Nothing to do: the default URL, `http://10.0.2.2:8000`, is how the emulator reaches your computer |
+| Phone by USB | `adb reverse tcp:8000 tcp:8000`, then `./gradlew installDebug -PbackendUrl=http://localhost:8000`. No permission needed |
+| Phone on the same Wi-Fi | `./gradlew installDebug -PbackendUrl=http://192.168.1.50:8000`, with your computer's address |
 
-**Tests:** `./gradlew testDebugUnitTest`, without an emulator or backend. One test reads a real backend response, so a renamed field fails a test instead of leaving an empty cell in the app.
+The URL is fixed at build time in `BuildConfig`. Debug builds allow plain HTTP to any host, because the local backend has no HTTPS; release builds only to `10.0.2.2` and `localhost`.
+
+### Open the debug screen
+
+The debug screen is for developers, so it is hidden behind debug mode:
+
+1. On the conversations screen, **hold "New conversation" for 3 seconds**. A short tap still opens a new chat.
+2. Confirm **Enter debug mode?**. A red "Debug mode" label appears in the top bar, and the setting is kept on the phone.
+3. In any chat, **long-press an answer**. The debug screen shows the model, latency, tokens, whether every number in the answer came from the tools, and each tool call with its arguments, status and full output, which can be copied.
+
+Hold the button again and choose **Leave** to turn it off. Without debug mode, a long press on an answer does nothing.
+
+### What the chat shows
+
+The answer text explains; the numbers are in cards and tables built from `products`, so they come from the database, not from the model's text.
+
+| What the answer is about | How it looks |
+|---|---|
+| One model | A card with every value, by service and by frequency, and the PDF page it comes from |
+| Several models that qualify, or the closest ones | A comparison table with a service and frequency selector. It opens on what the user asked for (`focus`); alternatives list why each one falls short |
+| A partial part number or a typo | A list of models to tap; tapping one asks about it |
+| A model listed as N/A | A card that says the tables give no values, and models with data to look at |
+
+3-phase ratings that the PDF does not assign to a service are marked `*`, and 24 V ratings that do not depend on the frequency `†`. A missing value is `—`, never `0`. A question that fails stays on screen with **Retry**; retrying does not duplicate it, because the backend saves a turn whole or not at all.
+
+Questions that show each view: `What is the torque of 762A00-11300000/A?`, then `And how much power does it draw?`; `What about the 1A?`; `I need at least 500 Nm, On/Off, 110 V`; `I need 3000 Nm modulating at 24 V`; `Which 3 phase actuators give at least 400 Nm modulating?`; `761A00-11330C00/A`.
+
+### Loading and errors
+
+| Situation | What the app does |
+|---|---|
+| Loading | A spinner, or "Looking up the tables…" while an answer is on its way |
+| Backend down or unreachable | "Can't reach the server" with **Retry**. A list already on screen stays, with the error above it |
+| `503` (model or database unavailable) | "The assistant is temporarily unavailable" with **Retry** |
+| `404` (conversation deleted) | "This conversation no longer exists", without Retry |
+| No conversations yet | A short hint, and example questions in a new chat |
+
+### How it is built
+
+| Decision | Why | Trade-off |
+|---|---|---|
+| MVVM: each screen draws a state that its ViewModel owns | Loading, empty and error states are tested without an emulator | More classes than putting logic in the screens |
+| Retrofit, kotlinx.serialization and manual dependency injection (`AppContainer`) | Standard and easy to follow; no annotation processing that could fail on another machine | Wiring by hand would not scale to many screens |
+| History lives only in the backend | One source of truth; offline use is not required | No offline mode |
+| The repository turns network and HTTP failures into app errors | Screens show "can't reach the server" or "temporarily unavailable", not exceptions | One more layer |
+| The debug screen reloads the answer from the backend | It shows what was saved, the same for a resumed conversation, with real loading and error states | One more request |
+| Debug mode needs a 3-second hold and a confirmation | End users do not find it by accident | Developers must read how to open it |
+| UI text in English | The agent answers in English and the client is in North America | — |
+
+**Tests:** `./gradlew testDebugUnitTest`, without an emulator or backend: ViewModels, table formatting, the Markdown subset, debug parsing and the HTTP layer against a fake server. One test reads a real backend response, so a renamed field fails a test instead of leaving an empty cell in the app.
 
 ## API
 

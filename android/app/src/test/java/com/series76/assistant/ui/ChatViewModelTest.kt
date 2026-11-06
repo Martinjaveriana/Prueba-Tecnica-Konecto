@@ -49,6 +49,8 @@ class ChatViewModelTest {
         assertTrue(viewModel.send("  Torque of 762A00-11300000/A?  "))
         val state = viewModel.state.value
         assertEquals("s-created", state.sessionId)
+        // The answer keeps the backend's id, so its debug can be opened.
+        assertTrue(state.messages.last().id != null)
         assertEquals("Torque of 762A00-11300000/A?", state.title)
         assertEquals(listOf("Torque of 762A00-11300000/A?", "On/Off gives 150 Nm."), state.messages.map { it.text })
         assertFalse(state.sending)

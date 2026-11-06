@@ -442,6 +442,36 @@ send("Torque of the 2A?") ─> [pregunta][esperando…] ─> repository.ask(sess
 | `products/ProductFormat.kt` | Nombres, unidades y el texto de cada diferencia |
 | `products/ProductCard.kt`, `ComparisonTable.kt`, `ChoiceList.kt`, `ProductsView.kt` | Las vistas de los productos |
 
+### App Android (Fase 4c: pantalla de debug)
+
+**Cómo se abre:** en la lista de conversaciones, mantener "New conversation" **3 segundos**, confirmar "Enter debug mode?" y, en el chat, **pulsación larga sobre una respuesta**. El modo queda guardado en el teléfono hasta apagarlo con el mismo gesto ("Leave").
+
+```
+Lista ──(mantener 3 s + confirmar)──> modo debug guardado
+Chat ──(pulsación larga en una respuesta)──> DebugScreen(session_id, message_id)
+                                                └─ GET /api/sessions/{id}/messages → busca el mensaje → muestra su debug
+```
+
+| Decisión | Por qué | Descartado |
+|---|---|---|
+| Un modo debug que se activa manteniendo "New conversation" 3 segundos y confirmando (idea de Martín) | Un usuario no llega por accidente: un toque corto sigue abriendo un chat, y aunque mantenga el botón, el diálogo le explica que es para desarrolladores | Pulsación larga directa sobre las respuestas, que cualquiera podría encontrar; o activarlo solo en compilaciones debug, que obligaría al evaluador a compilar otra versión |
+| El modo se guarda en `SharedPreferences` | No hay que repetir el gesto cada vez que se abre la app | Que se apague al cerrar la app |
+| Con el modo activo, la lista muestra "Debug mode" en rojo | Quien lo activó sabe que está encendido | No indicarlo |
+| El gesto de 3 s escucha antes que el botón y no consume el toque | Un toque corto llega al `onClick` del botón; al cumplir los 3 s, se traga el soltar para no abrir además un chat | `combinedClickable`, cuyo `onLongClick` dura medio segundo y no se puede alargar |
+| La pantalla de debug pide la conversación al backend y busca el mensaje | Muestra lo que quedó guardado, igual para una conversación retomada, y tiene estados reales de carga y error | Pasar el JSON por la navegación: es grande y la pantalla no tendría carga real |
+| El debug se lee a una estructura (`DebugInfo`) con todo opcional | Un mensaje guardado antes de existir un campo (por ejemplo `markdown_table`) se muestra sin ese dato, sin fallar | Mostrar solo el JSON crudo |
+| Resumen arriba (modelo, latencia, tokens, números sin verificar), cada tool con sus argumentos y `status`, la salida plegada y copiable, y el JSON completo al final | Lo más útil se lee de un vistazo; el detalle está a un toque | Todo desplegado: una sola salida ocupa varias pantallas |
+| Una llamada rechazada (salida en texto) se marca `rejected` en rojo con el motivo | Se ve cuando el agente pasó argumentos inválidos y se corrigió | Mostrarla como cualquier otra |
+
+**Qué hace cada archivo:**
+
+| Archivo | Qué hace |
+|---|---|
+| `data/DebugSettings.kt` | Guarda si el modo debug está activo |
+| `ui/common/HoldToTrigger.kt` | El gesto de mantener 3 segundos |
+| `ui/debug/DebugInfo.kt` | Lee el JSON del debug a lo que muestra la pantalla |
+| `ui/debug/DebugViewModel.kt`, `DebugScreen.kt` | La pantalla y sus estados: cargando, error, sin debug, con debug |
+
 ### Proyecto
 
 | Decisión | Por qué | Descartado |

@@ -37,6 +37,28 @@
     <string name="local_network_allow">Allow</string>
     <string name="local_network_settings">Open settings</string>
 
+    <string name="debug_mode">Debug mode</string>
+    <string name="debug_enable_title">Enter debug mode?</string>
+    <string name="debug_enable_text">For developers. With debug mode on, a long press on an answer shows the tools it called, their arguments and the data they returned.</string>
+    <string name="debug_disable_title">Leave debug mode?</string>
+    <string name="debug_disable_text">Long presses on answers will no longer open the debug screen.</string>
+    <string name="debug_enable">Enter</string>
+    <string name="debug_disable">Leave</string>
+    <string name="cancel">Cancel</string>
+    <string name="debug_enabled_message">Debug mode on: long-press an answer to see its debug.</string>
+    <string name="debug_disabled_message">Debug mode off.</string>
+    <string name="debug_title">Debug · answer #%1$d</string>
+    <string name="debug_none">No debug data</string>
+    <string name="debug_none_hint">This message has no debug, or it is no longer in the conversation.</string>
+    <string name="debug_no_tools">No tool was called in this answer.</string>
+    <string name="debug_no_args">No arguments</string>
+    <string name="debug_output">Output (JSON)</string>
+    <string name="debug_full_json">Full debug JSON</string>
+    <string name="debug_copy">Copy</string>
+    <string name="debug_numbers_ok">✓ Every number in the answer comes from the tools</string>
+    <string name="debug_numbers_unverified">Numbers not found in the tool results: %1$s</string>
+    <string name="debug_consulted">Part numbers consulted: %1$s</string>
+
     <string name="loading">Loading…</string>
     <string name="retry">Retry</string>
     <string name="error_unreachable">Can\'t reach the server. Check that the backend is running and the app points to it.</string>

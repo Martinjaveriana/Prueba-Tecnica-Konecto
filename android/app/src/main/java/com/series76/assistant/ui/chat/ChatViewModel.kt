@@ -18,6 +18,8 @@ import kotlinx.serialization.json.JsonObject
 /** One bubble. A question shows before the backend saves it, so it has a local key until then. */
 data class ChatMessage(
     val key: String,
+    /** The backend's id, once saved. The debug screen looks the message up by it. */
+    val id: Long? = null,
     val isUser: Boolean,
     val text: String,
     val products: List<Product> = emptyList(),
@@ -28,7 +30,7 @@ data class ChatMessage(
     val failed: Boolean = false,
 )
 
-fun Message.toChat() = ChatMessage("m$id", isUser, content, products, focus, needsClarification, debug)
+fun Message.toChat() = ChatMessage("m$id", id, isUser, content, products, focus, needsClarification, debug)
 
 data class ChatUiState(
     val sessionId: String? = null,
@@ -106,6 +108,7 @@ class ChatViewModel(
                 val response = repository.ask(_state.value.sessionId, question.text)
                 val answer = ChatMessage(
                     key = "m${response.messageId}",
+                    id = response.messageId,
                     isUser = false,
                     text = response.answer,
                     products = response.products,

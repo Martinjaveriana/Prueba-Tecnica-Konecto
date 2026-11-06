@@ -1,5 +1,6 @@
 package com.series76.assistant.ui.chat
 
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,6 +37,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -50,10 +54,18 @@ import com.series76.assistant.ui.common.LoadingView
 import com.series76.assistant.ui.common.messageFor
 
 @Composable
-fun ChatScreen(viewModel: ChatViewModel, onBack: () -> Unit) {
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    debugMode: Boolean,
+    onOpenDebug: (sessionId: String, messageId: Long) -> Unit,
+    onBack: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Only with debug mode on, and only for answers the backend saved.
+    val openDebug: ((Long) -> Unit)? = state.sessionId?.takeIf { debugMode }?.let { id -> { messageId -> onOpenDebug(id, messageId) } }
     ChatContent(
         state = state,
+        onOpenDebug = openDebug,
         onBack = onBack,
         onRetryHistory = viewModel::loadHistory,
         onSend = viewModel::send,
@@ -65,6 +77,7 @@ fun ChatScreen(viewModel: ChatViewModel, onBack: () -> Unit) {
 @Composable
 fun ChatContent(
     state: ChatUiState,
+    onOpenDebug: ((Long) -> Unit)?,
     onBack: () -> Unit,
     onRetryHistory: () -> Unit,
     onSend: (String) -> Boolean,
@@ -92,7 +105,7 @@ fun ChatContent(
                     state.error != null && state.messages.isEmpty() ->
                         ErrorView(state.error, onRetryHistory.takeIf { state.error != AppError.NotFound })
                     state.messages.isEmpty() -> Examples(onSend)
-                    else -> MessageList(state, onChoose = { onSend(it) }, onRetrySend = onRetrySend)
+                    else -> MessageList(state, onChoose = { onSend(it) }, onRetrySend = onRetrySend, onOpenDebug = onOpenDebug)
                 }
             }
             InputBar(enabled = state.canSend, onSend = onSend)
@@ -101,7 +114,12 @@ fun ChatContent(
 }
 
 @Composable
-private fun MessageList(state: ChatUiState, onChoose: (String) -> Unit, onRetrySend: () -> Unit) {
+private fun MessageList(
+    state: ChatUiState,
+    onChoose: (String) -> Unit,
+    onRetrySend: () -> Unit,
+    onOpenDebug: ((Long) -> Unit)?,
+) {
     val list = rememberLazyListState()
     // Follow the conversation: the waiting indicator, then the answer's first line, at the top of the screen.
     // Keyed on both, because the answer replaces the indicator and the item count does not change.
@@ -120,7 +138,7 @@ private fun MessageList(state: ChatUiState, onChoose: (String) -> Unit, onRetryS
             if (message.isUser) {
                 UserBubble(message, state.sendError.takeIf { message.failed }, onRetrySend)
             } else {
-                AssistantMessage(message, onChoose)
+                AssistantMessage(message, onChoose, onOpenDebug)
             }
         }
         if (state.sending) item(key = "thinking") { Thinking() }
@@ -151,12 +169,22 @@ private fun UserBubble(message: ChatMessage, error: AppError?, onRetry: () -> Un
 }
 
 @Composable
-private fun AssistantMessage(message: ChatMessage, onChoose: (String) -> Unit) {
+private fun AssistantMessage(message: ChatMessage, onChoose: (String) -> Unit, onOpenDebug: ((Long) -> Unit)?) {
+    val haptics = LocalHapticFeedback.current
+    val id = message.id
+    val debug = if (onOpenDebug != null && id != null) {
+        Modifier.combinedClickable(onClick = {}, onLongClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onOpenDebug(id)
+        })
+    } else {
+        Modifier
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             color = MaterialTheme.colorScheme.surfaceVariant,
             shape = MaterialTheme.shapes.large,
-            modifier = Modifier.widthIn(max = 340.dp),
+            modifier = Modifier.widthIn(max = 340.dp).clip(MaterialTheme.shapes.large).then(debug),
         ) {
             Text(markdownToAnnotated(message.text), Modifier.padding(12.dp), style = MaterialTheme.typography.bodyLarge)
         }
