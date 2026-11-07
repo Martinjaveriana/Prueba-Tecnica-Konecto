@@ -265,7 +265,7 @@ Dentro del emulador, `localhost` es el propio emulador, no tu computador. Tu com
 
 ## App Android
 
-Todos desde `android/`. Usan el Java que trae Android Studio; si `java -version` ya muestra 17 o más, puedes omitir `JAVA_HOME=...`.
+Todos desde `android/`. Usan el Java que trae Android Studio; si `java -version` ya muestra 17 o más, puedes omitir `JAVA_HOME=...`. En una carpeta que Android Studio nunca abrió (por ejemplo, un clon nuevo), Gradle no sabe dónde está el SDK: antes, `export ANDROID_HOME=~/Android/Sdk`.
 
 ### Compilar y correr los tests
 

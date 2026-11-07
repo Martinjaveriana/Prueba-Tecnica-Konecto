@@ -115,7 +115,11 @@ You need Android Studio (or the Android SDK and JDK 17+) and the backend running
 
 1. Start the backend from the repository root: `docker compose up -d --build --wait`.
 2. Start an emulator from Android Studio's Device Manager. The app was built and tested on Android 17 (API 37); it runs on Android 8 (API 26) and later.
-3. Open the `android/` folder in Android Studio and press Run, or from `android/`:
+3. Open the `android/` folder in Android Studio and press Run. Or, from `android/` in a terminal, tell Gradle where the Android SDK is (Android Studio does this by itself; `~/Android/Sdk` is its default location on Linux) and install:
+
+```bash
+export ANDROID_HOME=~/Android/Sdk
+```
 
 ```bash
 ./gradlew installDebug
@@ -364,6 +368,8 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `--extract and --audit need the optional dependencies` | You left out `--group extract` | Use the command it prints |
 | `port is already allocated` | Port 5433 or 8000 is in use | Change `POSTGRES_PORT` and `DATABASE_URL`, or `BACKEND_PORT`, in `.env` |
 | `N problems, nothing was written` | A value failed validation, so the previous data was kept | See the [guide to correcting the data](docs/guia-de-correcciones.md) |
+| The app says `The assistant is temporarily unavailable` | The backend answered 503: usually `OPENROUTER_API_KEY` is not set. `curl -s http://localhost:8000/health` shows `"language_model_configured": false` | Set the key in `.env`, then `docker compose up -d` |
+| `SDK location not found` when building the app from a terminal | Gradle does not know where the Android SDK is | `export ANDROID_HOME=~/Android/Sdk`, or open `android/` once in Android Studio |
 | The app shows `Can't reach the server` while the backend is up | The app points to another address, or local network access was denied | Check `-PbackendUrl`, and allow Nearby devices for the app in Android Settings |
 | `There is no saved reading` | That audit model has not been run | Set `GOOGLE_API_KEY` in `.env` |
 
