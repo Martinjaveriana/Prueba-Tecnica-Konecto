@@ -57,6 +57,7 @@
     <string name="debug_copy">Copy</string>
     <string name="debug_numbers_ok">✓ Every number in the answer comes from the tools</string>
     <string name="debug_numbers_unverified">Numbers not found in the tool results: %1$s</string>
+    <string name="debug_part_numbers_unverified">Part numbers not in the tables: %1$s</string>
     <string name="debug_consulted">Part numbers consulted: %1$s</string>
 
     <string name="loading">Loading…</string>

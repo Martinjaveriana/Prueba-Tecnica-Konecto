@@ -106,6 +106,8 @@ data class Difference(
     val actual: JsonElement? = null,
     @SerialName("requested_unit") val requestedUnit: String? = null,
     @SerialName("table_unit") val tableUnit: String? = null,
+    /** For min_torque: the user asked for strictly more than that value. */
+    val exclusive: Boolean? = null,
 )
 
 /** The service and frequency the question was about. null: the user did not say. */

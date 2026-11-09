@@ -35,6 +35,7 @@ data class DebugInfo(
     val outputTokens: Long?,
     val finishReason: String?,
     val unverifiedNumbers: List<String>,
+    val unverifiedPartNumbers: List<String>,
     val partNumbersConsulted: List<String>,
     /** Only the warnings that happened: an empty answer, a removed marker, a Markdown table. */
     val flags: List<String>,
@@ -55,6 +56,7 @@ data class DebugInfo(
             outputTokens = debug.number("output_tokens"),
             finishReason = debug.text("finish_reason"),
             unverifiedNumbers = debug.texts("unverified_numbers"),
+            unverifiedPartNumbers = debug.texts("unverified_part_numbers"),
             partNumbersConsulted = debug.texts("part_numbers_consulted"),
             flags = FLAGS.filter { (key, _) -> (debug[key] as? JsonPrimitive)?.booleanOrNull == true }.map { it.second },
             toolCalls = (debug["tool_calls"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::toolCall) },

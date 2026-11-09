@@ -130,6 +130,8 @@ def run_case(url: str, name: str, turns: list[str]) -> tuple[str, dict]:
                 ],
                 unverified=debug["unverified_numbers"],
                 markdown_table=debug.get("markdown_table"),
+                mentions_internals=debug.get("mentions_internals"),
+                unverified_part_numbers=debug.get("unverified_part_numbers"),
                 marker_removed=debug.get("marker_removed"),
                 finish=debug.get("finish_reason"),
                 tokens=(debug.get("input_tokens"), debug.get("output_tokens")),

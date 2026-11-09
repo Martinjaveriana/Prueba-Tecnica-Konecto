@@ -14,9 +14,9 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
-from app import language
+from app import catalog, language
 from app.config import settings
-from app.numbers import unverified_numbers
+from app.numbers import part_numbers_in, unverified_numbers, unverified_part_numbers
 from app.products import complete, focus_from, roles_from
 from app.tools import TOOLS
 
@@ -28,6 +28,9 @@ Numbers
   messages. For a follow-up question, call the tool again.
 - Earlier answers end with "[Part numbers consulted: ...]". When the user refers to a model from earlier,
   call get_actuator_specs with that exact part number.
+- If the user says it, its, that one or similar and your previous answer listed several models without the user
+  picking one: when the answer is the same for all of them, give it for all of them; otherwise ask which one they
+  mean and list the part numbers. Never assume the first one.
 - Pass torque to the tools in the unit the user stated. Never convert units yourself.
 - If the user wants a model's torque in ft-lbs or kgf-m, call get_actuator_specs with convert_torque true, give
   torque_ft_lbs_converted or torque_kgf_m_converted and say it is converted from the table. In search results, give
@@ -44,6 +47,15 @@ How to answer
 - Always write full part numbers, such as 762A00-11300000/A.
 - Asked for the largest or most powerful model: call recommend_actuators with sort_by highest_torque. The first
   result is the largest.
+- A torque the user needs, such as "I need 500 Nm", is a minimum: min_torque only. Use max_torque only if the user
+  says between, at most, no more than or exactly; "exactly" gives the same value in both. "More than" a value also
+  sets min_torque_exclusive. Models without a certification use exclude_certification, and a size uses size.
+- Asked how many models there are: give total_models, models_with_data and models_without_data from
+  list_available_options, models_by_enclosure for an enclosure, or the models field of a group. Code counted them;
+  do not add anything up.
+- A total from a search counts only models with data. If without_data_not_checked is above zero and you say how
+  many models exist, say they are the ones with data and add "in addition, N other models are listed without
+  values". Those N are not among the models you did not show.
 - Search results come smallest first, so the first one is the smallest that qualifies even if more exist. With
   shown lower than total, say how many you show out of the total.
 - Every model under matches already meets every requirement, in the unit the user stated: code checked it. Say so,
@@ -68,6 +80,9 @@ How to answer
   Series 76 actuators.
 - Never mention tools, functions, JSON or other internal details, and never write a "[Part numbers consulted]"
   line: the system adds it.
+- If you cannot do something, say what you can do and what information you need. Never explain it by talking about
+  your tools or your technical limitations. If the user asks about them directly, say you cannot share internal
+  details.
 
 Context
 - Weatherproof enclosures are for general industrial use. Explosionproof enclosures are for hazardous areas
@@ -83,6 +98,11 @@ CONSULTED_LINE = re.compile(r"\s*\[Part numbers consulted:[^\]]*\]")
 # Two or more lines like "| 763B00-11300000/A | 500 Nm |": a Markdown table, which the app shows as raw text
 # and which repeats the app's own table. Measured, not removed: removing it could drop the only copy of a value.
 TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$", re.MULTILINE)
+# Measured, not removed: a user can ask about these on purpose, and then refusing is the right answer.
+INTERNAL_WORDS = re.compile(
+    r"\b(?:tools?|functions?|json|schema|herramientas?|system prompt|" + "|".join(tool.name for tool in TOOLS) + r")\b",
+    re.IGNORECASE,
+)
 EMPTY_ANSWER = "I could not finish the answer. Please ask again."
 MAX_CONSULTED = 8
 CLARIFICATION_STATUSES = {"ambiguous", "not_found", "needs_requirements", "invalid"}
@@ -205,6 +225,11 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         "empty_answer": answer == EMPTY_ANSWER,
         "marker_removed": CONSULTED_PREFIX in raw_answer,
         "markdown_table": has_markdown_table(answer),
+        "mentions_internals": bool(INTERNAL_WORDS.search(answer)),
+        # Only when the answer has one, to skip the query otherwise.
+        "unverified_part_numbers": unverified_part_numbers(
+            answer, catalog.part_numbers(), " ".join([query, *(t["content"] for t in history if t["role"] == "user")])
+        ) if part_numbers_in(answer) else [],
         "unverified_numbers": unverified_numbers(
             # The arguments hold requirements stated in earlier turns, such as the 60 of "at least 60 Nm".
             answer, [call["output"] for call in tool_calls] + [call["args"] for call in tool_calls] + [query, SYSTEM_PROMPT]

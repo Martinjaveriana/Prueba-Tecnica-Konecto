@@ -89,6 +89,25 @@ class ProductFormatTest {
         assertEquals("Torque: asked at least 6000 ft-lb, has 70000 in-lbs", differenceText(ft))
     }
 
+    @Test fun `the new torque limits read in plain words`() {
+        assertEquals(
+            "Torque: asked more than 500 Nm, has 500 Nm",
+            differenceText(Difference("min_torque", JsonPrimitive(500.0), JsonPrimitive(500), requestedUnit = "nm", tableUnit = "nm", exclusive = true)),
+        )
+        assertEquals(
+            "Torque: asked at most 200 Nm, has 300 Nm",
+            differenceText(Difference("max_torque", JsonPrimitive(200.0), JsonPrimitive(300), requestedUnit = "nm", tableUnit = "nm")),
+        )
+    }
+
+    @Test fun `a certification to avoid and a size read in plain words`() {
+        assertEquals(
+            "Certification: asked without CSA, has CSA, CE",
+            differenceText(Difference("exclude_certification", JsonPrimitive("CSA"), JsonArray(listOf(JsonPrimitive("CSA"), JsonPrimitive("CE"))))),
+        )
+        assertEquals("Size: asked 5, has 4", differenceText(Difference("size", JsonPrimitive(5), JsonPrimitive(4))))
+    }
+
     @Test fun `other differences read in plain words`() {
         assertEquals("Voltage: asked 24 V, has 110 V", differenceText(Difference("voltage_v", JsonPrimitive(24), JsonPrimitive(110))))
         assertEquals(

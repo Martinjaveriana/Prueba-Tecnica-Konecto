@@ -11,6 +11,7 @@ from decimal import Decimal, InvalidOperation
 NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 # Counts such as "3 models" or "2 options" are not data from the tables.
 SMALL_INTEGER_LIMIT = 10
+PART_NUMBER = re.compile(r"\b76\d[A-Z0-9]{3}-[A-Z0-9]{8}/[A-Z]\b", re.IGNORECASE)
 
 
 def _candidates(token: str) -> set[Decimal]:
@@ -58,3 +59,18 @@ def unverified_numbers(answer: str, sources: list[object]) -> list[str]:
         if not candidates & allowed and token not in unverified:
             unverified.append(token)
     return unverified
+
+
+def part_numbers_in(text: str) -> list[str]:
+    """Text with the shape of a full part number, in the order it appears."""
+    return list(dict.fromkeys(match.upper() for match in PART_NUMBER.findall(text)))
+
+
+def unverified_part_numbers(answer: str, catalog: set[str], user_text: str) -> list[str]:
+    """Part numbers in the answer that the tables do not have and the user did not write.
+
+    A number check cannot see this: 767C00-11320000/C has the same digits as the real /A.
+    One the user wrote is allowed, because the answer may be saying that it does not exist.
+    """
+    written_by_user = set(part_numbers_in(user_text))
+    return [part for part in part_numbers_in(answer) if part not in catalog and part not in written_by_user]

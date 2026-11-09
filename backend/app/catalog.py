@@ -27,7 +27,7 @@ DEFAULT_LIMIT = 5
 ALIAS = re.compile(r"[1-7][A-Z]")
 # "76" is the whole series; from "761" on, a text can name a group of models.
 MIN_PREFIX_LENGTH = 3
-FIXED_CONDITIONS = {"enclosure", "voltage_v", "phases", "current_type", "service", "certification"}
+FIXED_CONDITIONS = {"enclosure", "voltage_v", "phases", "current_type", "service", "certification", "exclude_certification", "size"}
 
 NOTE_NO_DATA = "The table lists this model as N/A: it exists, but the PDF gives no values for it."
 NOTE_NOT_CSA = "Sizes 6 and 7 are not CSA Certified."
@@ -73,7 +73,18 @@ class Requirements(BaseModel):
     """Technical requirements for choosing an actuator. Leave out what the user did not ask for."""
 
     min_torque: float | None = Field(None, gt=0, description="Minimum output torque, in torque_unit.")
-    torque_unit: TorqueUnit | None = Field(None, description="Unit of min_torque, as the user stated it.")
+    min_torque_exclusive: bool = Field(
+        False, description="True when the user says more than min_torque, so a model at exactly that value does not qualify."
+    )
+    max_torque: float | None = Field(
+        None,
+        gt=0,
+        description=(
+            "Only when the user states an upper limit: between, at most, no more than or exactly. "
+            "A torque the user just needs, such as I need 70 Nm, is a minimum: leave this out."
+        ),
+    )
+    torque_unit: TorqueUnit | None = Field(None, description="Unit of min_torque and max_torque, as the user stated it.")
     service: Service | None = Field(None, description="Service type, if the user stated one.")
     enclosure: Enclosure | None = Field(None, description="explosionproof for hazardous areas.")
     voltage_v: int | None = Field(None, description="Supply voltage in volts.")
@@ -88,6 +99,10 @@ class Requirements(BaseModel):
     max_lra_a: float | None = Field(None, gt=0, description="Maximum locked rotor current, in amps.")
     max_motor_power_w: int | None = Field(None, gt=0, description="Maximum motor power, in watts.")
     certification: Certification | None = Field(None, description="Certification the model must have.")
+    exclude_certification: Certification | None = Field(
+        None, description="Certification the model must not have, for requests such as not CSA certified."
+    )
+    size: int | None = Field(None, ge=1, le=7, description="Actuator size from 1 to 7, the first character of the alias: 5A is size 5.")
     limit: int = Field(DEFAULT_LIMIT, gt=0, le=20, description="Maximum number of models to return.")
     sort_by: Literal["tightest", "highest_torque"] = Field(
         "tightest",
@@ -96,13 +111,15 @@ class Requirements(BaseModel):
 
     @model_validator(mode="after")
     def torque_needs_a_unit(self) -> "Requirements":
-        if self.min_torque is not None and self.torque_unit is None:
-            raise ValueError("torque_unit is required with min_torque: ask the user for the unit")
+        if (self.min_torque is not None or self.max_torque is not None) and self.torque_unit is None:
+            raise ValueError("torque_unit is required with min_torque or max_torque: ask the user for the unit")
+        if self.min_torque is not None and self.max_torque is not None and self.max_torque < self.min_torque:
+            raise ValueError("max_torque is below min_torque: ask the user which range is meant")
         return self
 
     def is_empty(self) -> bool:
         # Asking for the largest model is a request in itself, with no other requirement.
-        return self.sort_by == "tightest" and not self.model_dump(exclude_none=True, exclude={"limit", "sort_by"})
+        return self.sort_by == "tightest" and not self.model_dump(exclude_none=True, exclude={"limit", "sort_by", "min_torque_exclusive"})
 
 
 def _connect() -> psycopg.Connection:
@@ -203,6 +220,12 @@ def _lookup_record(actuator: dict, convert_torque: bool = False) -> dict:
             for rating in actuator["service_ratings"]
         ]
     return record
+
+
+def part_numbers() -> set[str]:
+    """Every part number in the tables."""
+    with _connect() as conn:
+        return {row["part_number"] for row in conn.execute("SELECT part_number FROM actuators").fetchall()}
 
 
 def _summary(actuator: dict) -> dict:
@@ -308,13 +331,13 @@ def _alternatives_to_no_data(actuator: dict, actuators: list[dict]) -> list[dict
     return same_alias + sorted(same_supply, key=lambda a: a["alias"])[:1]
 
 
-def _required_torque(req: Requirements) -> tuple[str, Decimal]:
+def _in_table_units(torque: float, unit: TorqueUnit) -> tuple[str, Decimal]:
     """Compare in the column of the requested unit: the PDF rounds each column on its own.
 
     Only units the PDF does not have are converted, and only with exact factors.
     """
-    value = Decimal(str(req.min_torque))
-    match req.torque_unit:
+    value = Decimal(str(torque))
+    match unit:
         case TorqueUnit.NM:
             return "torque_nm", value
         case TorqueUnit.IN_LBS:
@@ -323,14 +346,19 @@ def _required_torque(req: Requirements) -> tuple[str, Decimal]:
             return "torque_in_lbs", value * 12
         case TorqueUnit.KGF_M:
             return "torque_nm", value * Decimal("9.80665")
-    raise ValueError(req.torque_unit)
+    raise ValueError(unit)
+
+
+def _torque_column(req: Requirements, default: str) -> str:
+    return _in_table_units(1, req.torque_unit)[0] if req.torque_unit else default
 
 
 def _difference(requirement: str, requested: object, actual: object) -> dict:
     return {"requirement": requirement, "requested": requested, "actual": actual}
 
 
-def _model_differences(actuator: dict, req: Requirements) -> list[dict]:
+def _fixed_differences(actuator: dict, req: Requirements) -> list[dict]:
+    """Conditions a model listed as N/A can also be checked against: they do not need its ratings."""
     differences = []
     if req.enclosure and actuator["enclosure"] != req.enclosure:
         differences.append(_difference("enclosure", req.enclosure.value, actuator["enclosure"]))
@@ -340,25 +368,43 @@ def _model_differences(actuator: dict, req: Requirements) -> list[dict]:
         differences.append(_difference("phases", req.phases, actuator["phases"]))
     if req.current_type and actuator["current_type"] not in (req.current_type.value, "AC/DC"):
         differences.append(_difference("current_type", req.current_type.value, actuator["current_type"]))
-    if req.max_motor_power_w is not None and actuator["motor_power_w"] > req.max_motor_power_w:
-        differences.append(_difference("max_motor_power_w", req.max_motor_power_w, actuator["motor_power_w"]))
     if req.certification and req.certification.value not in actuator["certifications"]:
         differences.append(_difference("certification", req.certification.value, actuator["certifications"]))
+    if req.exclude_certification and req.exclude_certification.value in actuator["certifications"]:
+        differences.append(_difference("exclude_certification", req.exclude_certification.value, actuator["certifications"]))
+    size = int(actuator["alias"][0])
+    if req.size is not None and size != req.size:
+        differences.append(_difference("size", req.size, size))
+    return differences
+
+
+def _model_differences(actuator: dict, req: Requirements) -> list[dict]:
+    differences = _fixed_differences(actuator, req)
+    if req.max_motor_power_w is not None and actuator["motor_power_w"] > req.max_motor_power_w:
+        differences.append(_difference("max_motor_power_w", req.max_motor_power_w, actuator["motor_power_w"]))
     return differences
 
 
 def _condition_differences(service: dict, electrical: dict, req: Requirements) -> list[dict]:
     differences = []
+    # Name both units: 79,700 in-lbs must not read as a value in the ft-lb the user asked for.
+    def torque_difference(requirement: str, requested: float, column: str, in_table_units: Decimal) -> dict:
+        return {
+            **_difference(requirement, requested, service[column]),
+            "requested_unit": req.torque_unit.value,
+            "required_in_table_unit": float(in_table_units),
+            "table_unit": column.removeprefix("torque_"),
+        }
+
     if req.min_torque is not None:
-        column, required = _required_torque(req)
-        if service[column] < required:
-            # Name both units: 79,700 in-lbs must not read as a value in the ft-lb the user asked for.
-            differences.append({
-                **_difference("min_torque", req.min_torque, service[column]),
-                "requested_unit": req.torque_unit.value,
-                "required_in_table_unit": float(required),
-                "table_unit": column.removeprefix("torque_"),
-            })
+        column, required = _in_table_units(req.min_torque, req.torque_unit)
+        if service[column] < required or (req.min_torque_exclusive and service[column] == required):
+            difference = torque_difference("min_torque", req.min_torque, column, required)
+            differences.append({**difference, "exclusive": True} if req.min_torque_exclusive else difference)
+    if req.max_torque is not None:
+        column, allowed = _in_table_units(req.max_torque, req.torque_unit)
+        if service[column] > allowed:
+            differences.append(torque_difference("max_torque", req.max_torque, column, allowed))
     if req.min_duty_cycle_pct is not None and service["duty_cycle_pct"] < req.min_duty_cycle_pct:
         differences.append(_difference("min_duty_cycle_pct", req.min_duty_cycle_pct, service["duty_cycle_pct"]))
     for field, column in (("min_cycles_per_hour", "cycles_per_hour"), ("min_starts_per_hour", "starts_per_hour")):
@@ -401,13 +447,12 @@ def _evaluate(actuator: dict, req: Requirements) -> dict:
 
 
 def _torque_for_sorting(condition: dict, req: Requirements) -> int:
-    column = _required_torque(req)[0] if req.min_torque is not None else "torque_nm"
-    return condition["_service"][column]
+    return condition["_service"][_torque_column(req, "torque_nm")]
 
 
 def _largest_torque(evaluation: dict, req: Requirements) -> tuple[int, int]:
     """The model's highest qualifying torque. In-lbs breaks ties: the PDF rounds Nm more coarsely."""
-    column = _required_torque(req)[0] if req.min_torque is not None else "torque_in_lbs"
+    column = _torque_column(req, "torque_in_lbs")
     return max((c["_service"][column], c["_service"]["torque_in_lbs"]) for c in evaluation["meets"])
 
 
@@ -474,6 +519,18 @@ def _closest(actuators: list[dict], req: Requirements) -> list[dict]:
     ]
 
 
+def _combination_exists(actuators: list[dict], req: Requirements) -> bool:
+    """Whether any model has this enclosure, supply, service, certification and size, at any rating.
+
+    A model without data counts for the service: the table does not say which services it has.
+    """
+    return any(
+        not _fixed_differences(a, req)
+        and (not req.service or not a["has_data"] or any(r["service"] in (req.service, "unspecified") for r in a["service_ratings"]))
+        for a in actuators
+    )
+
+
 def recommend(req: Requirements) -> dict:
     """Models that meet the requirements, tightest fit first. Alternatives only if none does."""
     if req.is_empty():
@@ -492,11 +549,17 @@ def recommend(req: Requirements) -> dict:
             matches.append((actuator, evaluation))
 
     if not matches:
+        exists = _combination_exists(actuators, req)
         return {
             "status": "no_matches",
+            "combination_exists": exists,
             "message": (
                 "No model meets every requirement. Say so first, then offer these as the closest "
                 "options and explain each difference."
+                if exists else
+                "No Series 76 model has this combination of enclosure, supply, service, certification and size, "
+                "at any torque or speed. Say so first. Do not suggest changing the torque, speed or current: "
+                "that cannot help. Offer these as the closest options, which differ in one of those conditions."
             ),
             "closest": _closest(actuators, req),
         }
@@ -510,6 +573,8 @@ def recommend(req: Requirements) -> dict:
         "status": "matches",
         "total": len(matches),
         "shown": min(len(matches), req.limit),
+        # total counts models with data. These also fit the fixed conditions, but the tables give no values for them.
+        "without_data_not_checked": sum(not a["has_data"] and not _fixed_differences(a, req) for a in actuators),
         "matches": [
             {
                 **actuator,
@@ -528,12 +593,13 @@ def available_options() -> dict:
         supplies = conn.execute(
             """
             SELECT a.enclosure, a.voltage_v, a.phases, a.current_type,
-                   count(*) AS models,
-                   array_agg(DISTINCT s.service) AS services,
+                   count(DISTINCT a.part_number) AS models,
+                   count(DISTINCT a.part_number) FILTER (WHERE NOT a.has_data) AS models_without_data,
+                   array_agg(DISTINCT s.service) FILTER (WHERE s.service IS NOT NULL) AS services,
                    min(s.torque_nm) AS min_torque_nm, max(s.torque_nm) AS max_torque_nm,
                    min(s.torque_in_lbs) AS min_torque_in_lbs, max(s.torque_in_lbs) AS max_torque_in_lbs
             FROM actuators a
-            JOIN service_ratings s USING (part_number)
+            LEFT JOIN service_ratings s USING (part_number)
             GROUP BY a.enclosure, a.voltage_v, a.phases, a.current_type
             ORDER BY a.enclosure, a.voltage_v, a.phases, a.current_type
             """
@@ -547,8 +613,19 @@ def available_options() -> dict:
         hazardous = conn.execute(
             "SELECT DISTINCT unnest(hazardous_classification) AS classification FROM actuators ORDER BY 1"
         ).fetchall()
+    total = sum(group["models"] for group in supplies)
+    without_data = sum(group["models_without_data"] for group in supplies)
+    by_enclosure: dict[str, dict] = {}
+    for group in supplies:
+        counts = by_enclosure.setdefault(group["enclosure"], {"models": 0, "models_without_data": 0})
+        counts["models"] += group["models"]
+        counts["models_without_data"] += group["models_without_data"]
     return {
         "status": "ok",
+        "total_models": total,
+        "models_with_data": total - without_data,
+        "models_without_data": without_data,
+        "models_by_enclosure": by_enclosure,
         "power_supplies": supplies,
         "certifications": [row["certification"] for row in certifications],
         "frequencies_hz": [row["frequency_hz"] for row in frequencies],

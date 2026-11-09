@@ -39,9 +39,10 @@ class DebugInfoTest {
 
     @Test fun `warnings and unverified numbers are listed`() {
         val info = DebugInfo.from(debugOf("""{"marker_removed":true,"markdown_table":false,"empty_answer":false,
-            "unverified_numbers":["2780"],"part_numbers_consulted":["762A00-11300000/A"],"tool_calls":[]}"""))
+            "unverified_numbers":["2780"],"unverified_part_numbers":["767C00-11320000/C"],"part_numbers_consulted":["762A00-11300000/A"],"tool_calls":[]}"""))
         assertEquals(listOf("Internal marker removed"), info.flags)
         assertEquals(listOf("2780"), info.unverifiedNumbers)
+        assertEquals(listOf("767C00-11320000/C"), info.unverifiedPartNumbers)
         assertEquals(listOf("762A00-11300000/A"), info.partNumbersConsulted)
     }
 

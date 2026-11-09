@@ -106,6 +106,13 @@ private fun Summary(info: DebugInfo) {
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            if (info.unverifiedPartNumbers.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.debug_part_numbers_unverified, info.unverifiedPartNumbers.joinToString(", ")),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             if (info.partNumbersConsulted.isNotEmpty()) {
                 Text(stringResource(R.string.debug_consulted, info.partNumbersConsulted.joinToString(", ")), style = MaterialTheme.typography.bodySmall)
             }

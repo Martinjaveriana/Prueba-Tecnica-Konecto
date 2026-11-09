@@ -41,6 +41,7 @@ class Difference(BaseModel):
     requested_unit: str | None = Field(None, description="For min_torque: the unit the user asked in.")
     table_unit: str | None = Field(None, description="For min_torque: the table column it was compared in.")
     required_in_table_unit: float | None = None
+    exclusive: bool | None = Field(None, description="For min_torque: the user asked for strictly more than that value.")
 
 
 class Product(BaseModel):

@@ -524,3 +524,141 @@ def test_the_catalog_lists_hazardous_classifications_and_notes():
     options = catalog.available_options()
     assert "Class I, Division 1, Groups C, D; T4" in options["hazardous_classifications"]
     assert any("IEC 60034-1" in note for note in options["datasheet_notes"])
+
+
+# ---------- Counting models ----------
+
+
+def test_options_count_each_model_once():
+    # A model has one row per service: counting rows gave 22 models where the table has 11.
+    groups = {
+        (g["enclosure"], g["voltage_v"], g["phases"], g["current_type"]): g
+        for g in catalog.available_options()["power_supplies"]
+    }
+    assert groups[("weatherproof", 110, 1, "AC")]["models"] == 11
+    assert groups[("weatherproof", 220, 1, "AC")]["models"] == 16
+    assert groups[("explosionproof", 110, 1, "AC")]["models"] == 10
+    assert groups[("explosionproof", 220, 1, "AC")]["models"] == 10
+
+
+def test_options_include_the_models_without_data():
+    options = catalog.available_options()
+    three_phase = next(g for g in options["power_supplies"] if g["phases"] == 3)
+    assert (three_phase["models"], three_phase["models_without_data"]) == (11, 4)
+    assert three_phase["services"] == ["unspecified"]
+    assert (options["total_models"], options["models_with_data"], options["models_without_data"]) == (68, 64, 4)
+
+
+def test_a_search_says_how_many_models_it_could_not_check():
+    assert catalog.recommend(Requirements(enclosure="weatherproof", limit=1))["without_data_not_checked"] == 4
+    assert catalog.recommend(Requirements(enclosure="weatherproof", voltage_v=110))["without_data_not_checked"] == 0
+    assert catalog.recommend(Requirements(enclosure="weatherproof", limit=1))["total"] == 34
+
+
+# ---------- Filters ----------
+
+
+WEATHERPROOF_110_ON_OFF = {"enclosure": "weatherproof", "voltage_v": 110, "service": "on_off", "limit": 20}
+
+
+def part_numbers(**requirements) -> list[str]:
+    return [m["part_number"] for m in catalog.recommend(Requirements(**requirements))["matches"]]
+
+
+def test_models_without_a_certification():
+    assert part_numbers(exclude_certification="CSA", limit=20) == [
+        "766A00-11320000/A", "766B00-11320000/A", "767A00-11320000/A", "767B00-11320000/A", "767C00-11320000/A",
+    ]
+
+
+def test_a_torque_range_excludes_what_is_above_it():
+    assert part_numbers(**WEATHERPROOF_110_ON_OFF, min_torque=100, max_torque=200, torque_unit="nm") == [
+        "761B00-11300000/A", "762A00-11300000/A", "762B00-11300000/A",
+    ]
+
+
+def test_an_exact_torque_is_a_range_of_one_value():
+    assert part_numbers(**WEATHERPROOF_110_ON_OFF, min_torque=150, max_torque=150, torque_unit="nm") == ["762A00-11300000/A"]
+
+
+def test_more_than_leaves_out_a_model_at_exactly_that_value():
+    strict = part_numbers(**WEATHERPROOF_110_ON_OFF, min_torque=500, min_torque_exclusive=True, torque_unit="nm")
+    assert "763B00-11300000/A" not in strict
+    assert len(strict) == 5
+
+
+def test_at_least_still_includes_a_model_at_exactly_that_value():
+    assert part_numbers(**WEATHERPROOF_110_ON_OFF, min_torque=500, torque_unit="nm")[0] == "763B00-11300000/A"
+
+
+def test_the_maximum_is_compared_in_the_unit_requested():
+    # 880 in-lbs is listed as 100 Nm: a limit in in-lbs must use the in-lbs column.
+    assert part_numbers(**WEATHERPROOF_110_ON_OFF, max_torque=880, torque_unit="in_lbs")[-1] == "761B00-11300000/A"
+    assert part_numbers(**WEATHERPROOF_110_ON_OFF, max_torque=879, torque_unit="in_lbs") == ["761A00-11300000/A"]
+
+
+def test_a_size_keeps_only_that_size():
+    assert part_numbers(enclosure="weatherproof", voltage_v=220, phases=1, size=5) == ["765A00-11320000/A", "765B00-11320000/A"]
+
+
+def test_a_maximum_needs_a_unit():
+    with pytest.raises(ValueError, match="torque_unit is required"):
+        Requirements(max_torque=200)
+
+
+def test_a_range_cannot_be_upside_down():
+    with pytest.raises(ValueError, match="below min_torque"):
+        Requirements(min_torque=300, max_torque=200, torque_unit="nm")
+
+
+def test_more_than_alone_is_not_a_requirement():
+    assert Requirements(min_torque_exclusive=True).is_empty()
+
+
+def test_alternatives_say_which_new_condition_failed():
+    closest = catalog.recommend(Requirements(**WEATHERPROOF_110_ON_OFF, min_torque=3000, min_torque_exclusive=True, torque_unit="nm"))["closest"]
+    assert closest[0]["differences"][0]["requirement"] == "min_torque"
+    assert closest[0]["differences"][0]["exclusive"] is True
+    below = catalog.recommend(Requirements(**WEATHERPROOF_110_ON_OFF, max_torque=10, torque_unit="nm"))["closest"]
+    assert below[0]["differences"][0]["requirement"] == "max_torque"
+    assert below[0]["part_number"] == "761A00-11300000/A"
+
+
+# ---------- A combination that does not exist, and totals by enclosure ----------
+
+
+@pytest.mark.parametrize(
+    "requirements",
+    [
+        {"enclosure": "weatherproof", "voltage_v": 24},
+        {"enclosure": "explosionproof", "phases": 3},
+        {"voltage_v": 24, "current_type": "AC", "service": "modulating"},
+        {"voltage_v": 480},
+    ],
+)
+def test_a_combination_no_model_has_is_reported(requirements):
+    result = catalog.recommend(Requirements(**requirements, min_torque=50, torque_unit="nm"))
+    assert result["status"] == "no_matches"
+    assert result["combination_exists"] is False
+    assert "Do not suggest changing the torque" in result["message"]
+
+
+@pytest.mark.parametrize(
+    "requirements",
+    [
+        {"enclosure": "weatherproof", "voltage_v": 110, "min_torque": 50000, "torque_unit": "nm"},
+        {"voltage_v": 24, "service": "modulating", "min_torque": 50000, "torque_unit": "nm"},
+    ],
+)
+def test_a_combination_that_only_falls_short_is_not_reported_as_missing(requirements):
+    result = catalog.recommend(Requirements(**requirements))
+    assert result["status"] == "no_matches"
+    assert result["combination_exists"] is True
+
+
+def test_options_total_each_enclosure():
+    by_enclosure = catalog.available_options()["models_by_enclosure"]
+    assert by_enclosure == {
+        "explosionproof": {"models": 30, "models_without_data": 0},
+        "weatherproof": {"models": 38, "models_without_data": 4},
+    }

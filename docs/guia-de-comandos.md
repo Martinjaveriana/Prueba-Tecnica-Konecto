@@ -90,6 +90,8 @@ uv run uvicorn app.api:app --reload
 
 ### Comparar modelos
 
+La última corrida, solo con Haiku y tras agregar los filtros nuevos, está en `eval/results-run5-new-filters.json`.
+
 Desde `backend/`. Gasta de la clave de OpenRouter, unos centavos por modelo. Corre las mismas 14 preguntas con cada modelo y guarda el resultado en `eval/results.json`. Las dos corridas con las que se eligió el modelo están en `eval/results-run1-max-tokens-1000.json` y `eval/results-run2-max-tokens-3000.json`; la tercera, solo Haiku tras prohibir las tablas, en `eval/results-run3-no-tables.json`; la cuarta, después de los arreglos de las pruebas adversariales, en `eval/results-run4-after-adversarial-fixes.json`. Para guardar en otro archivo: `--out eval/mi-corrida.json`.
 
 ```bash

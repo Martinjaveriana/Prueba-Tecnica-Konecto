@@ -496,6 +496,37 @@ Una batería de 40 preguntas en inglés y español, más 18 centradas en presion
 
 **Lo que queda, sin afectar los datos:** restas pequeñas como "one second over" pasan porque el verificador ignora enteros hasta 10; y el verificador tampoco detecta una resta cuyo resultado coincide con otro valor de las tablas. Las reglas del prompt reducen estos casos, pero no los eliminan.
 
+### Segunda ronda de preguntas difíciles
+
+28 preguntas nuevas, pensadas para lo que la batería de 58 no tocaba: rangos, "más de", tamaños, precio, conteos y guiones raros. Cada respuesta se comparó con la base. Los valores técnicos eran correctos, y hubo un número falso que venía de una tool.
+
+| Caso | Qué pasaba | Causa | Arreglo | Descartado |
+|---|---|---|---|---|
+| "¿Cuántos modelos hay?" | Decía 20, 22 y 32 modelos en grupos que tienen 10, 11 y 16, y no daba el total | `count(*)` sobre un JOIN cuenta una fila por servicio. El verificador no lo ve, porque el número sale de la tool | `count(DISTINCT part_number)`, y la tool devuelve `total_models` (68), `models_with_data` (64) y `models_without_data` (4) | Pedirle al LLM que sume los grupos |
+| "Hay 34 weatherproof" | Son 38: 34 con datos y 4 marcados N/A | La búsqueda solo evalúa modelos con datos | `without_data_not_checked` dice cuántos cumplen las condiciones fijas pero no tienen valores | Contarlos como resultados: no se puede saber si cumplen un torque |
+| "¿Cuáles no tienen CSA?" | Sin contexto, decía que no podía | Solo se podía filtrar por certificaciones que el modelo tiene | `exclude_certification` | Devolver todos los modelos y que el LLM los filtre |
+| Rango, "más de", "exactamente", "tamaño 5" | El texto excluía modelos, pero la tabla de la app los mostraba bajo "Meets your requirements" | Solo existía el mínimo de torque, así que los resultados incluían lo que el usuario descartó | `max_torque`, `min_torque_exclusive` y `size`, evaluados por código en la misma columna de la unidad pedida | Filtrar los productos según el texto del LLM: la tabla dejaría de salir solo de la base |
+| "What is its torque?" tras listar varios | Elegía el primero sin preguntar | Faltaba la regla | Preguntar cuál cuando la respuesta anterior listó varios | — |
+| Part number mal escrito | En 1 de 5 respuestas escribió `767C00-11320000/C` en vez de `/A` | El verificador solo mira números, y los dígitos coinciden | `debug.unverified_part_numbers` compara cada part number de la respuesta con las tablas y con lo que escribió el usuario. Solo lo registra: la tabla de la app sale de la base y siempre está bien | Generar la respuesta de nuevo: más lógica para un caso raro, cerca de la entrega |
+| Weatherproof a 24 V | Sugería "un torque menor", y a 24 V no existe ningún weatherproof | La búsqueda no distinguía "no llega" de "no existe" | `combination_exists` lo calcula el código, y el mensaje de la tool le dice que no sugiera cambiar el torque | Una regla más en las instrucciones, que el LLM cumple a veces |
+| "¿Cuántos weatherproof hay?" | Daba 11, 16 y 11 y se negaba a sumar | La regla de no hacer cuentas, y la tool solo daba el total general | `models_by_enclosure`: 38 weatherproof y 30 explosionproof, sumados por código | Permitirle al LLM esa suma |
+| "my search tool…" | Explicaba un límite hablando de su tool | La regla decía qué evitar, no cómo explicarlo | Decir qué sí puede hacer y qué dato necesita; `debug.mentions_internals` lo mide | Borrar esas frases por código: si el usuario pregunta por las tools, negarse es correcto |
+
+**Un retroceso que detectó la comparación:** la primera versión de la regla hizo que "I need 70 ft-lb" se leyera como *exactamente* 70, y no encontraba nada. "Necesito X" es un mínimo: `max_torque` se usa solo con entre, como máximo o exactamente.
+
+**Un segundo retroceso, detectado con la batería de 58 casos:** la regla de "its" hizo que Q11 ("¿puedo usar ese modelo de 24 V DC en weatherproof?") preguntara cuál de los dos, cuando la respuesta es "no" para ambos. Ahora pregunta solo si la respuesta depende del modelo: Q11 respondió "no" en 4 de 4. La frase de los modelos sin datos también decía "los 4 restantes", como si fueran los no mostrados; ahora dice "además, otros 4".
+
+**Redondeo:** "2.3 A, which rounds to 2 A" se dejó así. El usuario lo pidió, y la respuesta y la tarjeta muestran el valor de la tabla.
+
+**Resultado:** la comparación sigue en 14/14, con 0 tablas, 0 números sin verificar y 0 menciones internas (`backend/eval/results-run5-new-filters.json`). Rango, "más de", "exactamente", tamaño y conteo dan lo correcto; "sin CSA" acertó en 5 de 5; "I need 70 ft-lb" en 4 de 4. En la batería de 58 casos (81 turnos), corrida con el código final, no hubo errores del servidor, tablas, respuestas cortadas ni part numbers inexistentes, y cada número se revisó contra el modelo que nombra su línea (`backend/eval/results-adversarial.json`).
+
+**Lo que queda:**
+- "What is its torque?" preguntó en 7 de 8 intentos; en el otro eligió el primero, y dijo cuál.
+- Un part number mal escrito ahora se detecta, pero el usuario lo vería igual en el texto.
+- Restas pequeñas como "1 second slower" pasan, porque el verificador ignora enteros hasta 10. Son correctas, pero las instrucciones se las prohíben.
+- "Five of the six models meet the 500 Nm minimum" apareció una vez: cumplen los seis y muestra cinco.
+- Un guion raro pegado desde un PDF depende de que el LLM lo limpie.
+
 ### Proyecto
 
 | Decisión | Por qué | Descartado |

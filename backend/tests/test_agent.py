@@ -266,3 +266,39 @@ def test_the_agent_is_told_when_older_turns_are_missing():
 
 def test_the_instructions_forbid_arithmetic():
     assert "Never do arithmetic" in SYSTEM_PROMPT
+
+
+def test_mentioning_internal_details_is_reported():
+    model = scripted(say("My search tool only finds models that have a certification."))
+    assert run_turn("Which ones lack CSA?", [], model).debug["mentions_internals"] is True
+
+
+def test_naming_a_tool_is_reported():
+    model = scripted(say("I would call recommend_actuators for that."))
+    assert run_turn("How do you search?", [], model).debug["mentions_internals"] is True
+
+
+def test_a_normal_answer_mentions_nothing_internal():
+    model = scripted(call("get_actuator_specs", identifier="762A00-11300000/A"), say("It gives 150 Nm in On/Off."))
+    assert run_turn("Torque of 762A00-11300000/A?", [], model).debug["mentions_internals"] is False
+
+
+def test_a_part_number_the_tables_do_not_have_is_reported():
+    model = scripted(say("The model is 767C00-11320000/C."))
+    assert run_turn("Which one?", [], model).debug["unverified_part_numbers"] == ["767C00-11320000/C"]
+
+
+def test_a_real_part_number_is_not_reported():
+    model = scripted(say("The models are **767C00-11320000/A** and 761A00-11330C00/A."))
+    assert run_turn("Which one?", [], model).debug["unverified_part_numbers"] == []
+
+
+def test_a_part_number_the_user_wrote_is_not_reported():
+    model = scripted(say("761A00-11380000/A is not in the tables."))
+    assert run_turn("Specs of 761a00-11380000/a?", [], model).debug["unverified_part_numbers"] == []
+
+
+def test_a_wrong_part_number_from_an_earlier_user_turn_is_not_reported():
+    history = [{"role": "user", "content": "Specs of 761A00-11380000/A?", "part_numbers": []}]
+    model = scripted(say("As I said, 761A00-11380000/A is not in the tables."))
+    assert run_turn("Are you sure?", history, model).debug["unverified_part_numbers"] == []

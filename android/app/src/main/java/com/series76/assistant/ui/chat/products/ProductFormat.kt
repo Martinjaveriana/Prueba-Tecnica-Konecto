@@ -43,6 +43,7 @@ private val REQUIREMENTS = mapOf(
     "enclosure" to Requirement("Enclosure"),
     "service" to Requirement("Service"),
     "certification" to Requirement("Certification"),
+    "size" to Requirement("Size"),
     "max_motor_power_w" to Requirement("Motor power", " W", "at most "),
     "min_duty_cycle_pct" to Requirement("Duty cycle", " %", "at least "),
     "min_cycles_per_hour" to Requirement("Cycles per hour", "", "at least "),
@@ -61,11 +62,17 @@ fun differenceText(d: Difference): String {
     }
     val asked = jsonText(d.requested, names)?.removeSuffix(".0") ?: DASH
     val has = jsonText(d.actual, names)
-    if (d.requirement == "min_torque") {
+    if (d.requirement == "min_torque" || d.requirement == "max_torque") {
+        val bound = when {
+            d.requirement == "max_torque" -> "at most"
+            d.exclusive == true -> "more than"
+            else -> "at least"
+        }
         val askedUnit = TORQUE_UNITS[d.requestedUnit] ?: d.requestedUnit.orEmpty()
         val tableUnit = TORQUE_UNITS[d.tableUnit] ?: d.tableUnit.orEmpty()
-        return "Torque: asked at least $asked $askedUnit, has ${has ?: DASH} $tableUnit".trim()
+        return "Torque: asked $bound $asked $askedUnit, has ${has ?: DASH} $tableUnit".trim()
     }
+    if (d.requirement == "exclude_certification") return "Certification: asked without $asked, has ${has ?: DASH}"
     val r = REQUIREMENTS[d.requirement] ?: Requirement(d.requirement)
     val actual = has?.let { "has $it${r.unit}" } ?: "not in the table"
     return "${r.label}: asked ${r.bound}$asked${r.unit}, $actual"
