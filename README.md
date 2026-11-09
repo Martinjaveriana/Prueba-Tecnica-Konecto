@@ -14,7 +14,9 @@ A technical assistant for choosing Series 76 electric actuators: a Python backen
 
 ## Quick start
 
-**You need:** [Docker](https://docs.docker.com/get-docker/) with Docker Compose, and an [OpenRouter](https://openrouter.ai/) API key for the agent to answer.
+**You need:** [Docker](https://docs.docker.com/get-docker/) with Docker Compose 2.24 or later (tested with 2.40), and an [OpenRouter](https://openrouter.ai/) API key for the agent to answer. Check your version with `docker compose version`.
+
+The first build downloads the Python packages, and the first Android build downloads Gradle 9.6.1 and the SDK platform, so both need a working internet connection. You do not need to install Gradle.
 
 From the root of the repository, create your configuration:
 
