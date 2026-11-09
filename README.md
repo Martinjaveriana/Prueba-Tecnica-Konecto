@@ -358,6 +358,42 @@ uv run python try_tools.py options
 
 Every decision, the alternatives rejected and the OCR tools compared are in [docs/decisiones-de-diseno.md](docs/decisiones-de-diseno.md), in Spanish. So are the [command guide](docs/guia-de-comandos.md) and the [guide to correcting the data](docs/guia-de-correcciones.md).
 
+## Future improvements
+
+Not built, in rough order of value. The optional login and voice messages were left out to keep the time on the required parts.
+
+**App**
+
+| Improvement | Why |
+|---|---|
+| Company look: logo, colors and typography | The app uses a neutral Material theme, and the system colors on Android 12 and later |
+| Delete and rename conversations | Today they can only be created and opened. It needs a `DELETE` endpoint and a confirmation step |
+| Search and filter the conversation list | The list grows with use |
+| "Show more" in search results | A search shows 5 models by default, up to 20 |
+| Copy a part number, and export a comparison as PDF or CSV | Engineers paste these into purchase orders and reports |
+| Answers that appear as they are written | An answer takes a few seconds, and today it arrives all at once |
+| Set the backend URL inside the app | Today it is fixed when the app is built |
+| Login and voice messages | The two optional parts of the assessment |
+
+**Agent**
+
+| Improvement | Why |
+|---|---|
+| Write the answer again when a part number is not in the tables | Today code reports it in `debug`, but the user would still read it in the text |
+| Decide in code when "it" could mean several models | The instruction works most of the time, not always |
+| Report small calculations in the number check | Whole numbers up to 10 are skipped, so "1 second slower" passes |
+| Normalize unusual hyphens and slashes in code | Part numbers pasted from a PDF depend on the model cleaning them |
+
+**Backend and data**
+
+| Improvement | Why |
+|---|---|
+| Database migrations | Tables are created at startup, which does not cover changing an existing schema |
+| HTTPS, rate limits and per-user access | Needed before leaving a local network |
+| Run the tests and the question sets on every change | Two instruction changes here broke unrelated cases: the 14-question comparison caught one and the 58 adversarial cases the other |
+| Dashboards for cost, latency and unverified numbers | `debug` has the data for one answer, not trends |
+| A declared format for each new datasheet | The table structure is specific to this PDF, so another product line needs its own |
+
 ## Troubleshooting
 
 | What you see | What it means | What to do |
