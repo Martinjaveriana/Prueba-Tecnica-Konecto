@@ -243,7 +243,7 @@ Claude Haiku 5.5 passed every check in both runs, was the fastest, and costs abo
 The first run, with a limit of 1000 tokens, exposed three problems that were fixed before the final run:
 
 - **Cut answers:** GPT-5 mini and Qwen reason before answering, and with 1000 tokens some answers came out empty. The limit is now 3000, and a cut answer shows in `debug.finish_reason`.
-- **An adversarial round:** 58 cases in English and Spanish (81 turns) found three wrong answers, all fixed: "the highest torque model" lost the largest one to the result limit, the agent could not see the notes printed under the tables (voltage +/-10%, frequency +/-5%), and past 6 turns it took the oldest turn it could see for the first. After the fixes the 14 questions above still pass, 14/14 (`backend/eval/results-run4-after-adversarial-fixes.json`).
+- **An adversarial round:** 58 cases in English and Spanish (81 turns) found three wrong answers, all fixed: "the highest torque model" lost the largest one to the result limit, the agent could not see the notes printed under the tables (voltage +/-10%, frequency +/-5%), and past 6 turns it took the oldest turn it could see for the first. After the fixes the 14 questions above still pass, 14/14 (`backend/eval/results-run4-after-adversarial-fixes.json`). To repeat the round, from `backend/` and with the backend running: `uv run python eval_adversarial.py`. The last results are in `backend/eval/results-adversarial.json`.
 - **Markdown tables in the answers:** Haiku wrote tables in 3 of 14 answers, which the app showed as raw `|` text next to its own table. The instructions now say not to, and `debug.markdown_table` measures it. A rerun with Haiku alone kept 14/14 with 0 tables (`backend/eval/results-run3-no-tables.json`).
 - **An internal marker in the answers:** all three models copied the `[Part numbers consulted]` line into their answers, Haiku in 9 of 14. Code now removes it, and `debug.marker_removed` records when it did.
 - **Off-topic answers:** Haiku answered "Paris" before redirecting. The instructions now tell the model not to answer.
@@ -382,7 +382,7 @@ Every decision, the alternatives rejected and the OCR tools compared are in [doc
 | `backend/ingestion/` | Its stages: structure, extract, build, load, audit |
 | `backend/data/` | Raw, corrected, processed and audit data |
 | `backend/app/` | API (`api.py`), agent (`agent.py`), number check (`numbers.py`), product schema (`products.py`), conversations, queries (`catalog.py`), tools and schema |
-| `backend/eval_agent.py`, `backend/eval/` | Compares language models on the same questions, and the saved results |
+| `backend/eval_agent.py`, `backend/eval_adversarial.py`, `backend/eval/` | Compares language models on the same questions, runs the 58 adversarial cases, and the saved results |
 | `backend/Dockerfile` | The backend image, without the OCR dependencies |
 | `backend/tests/` | Tests |
 | `docs/` | The assessment, source PDFs and project guides |

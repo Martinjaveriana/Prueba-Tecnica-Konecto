@@ -475,7 +475,7 @@ Chat ──(pulsación larga en una respuesta)──> DebugScreen(session_id, me
 
 ### Pruebas adversariales (58 casos, 81 turnos)
 
-Una batería de 40 preguntas en inglés y español, más 18 centradas en presionar al agente (estimar un N/A, atribuirle algo que no dijo, "actualizar" un dato, pedir su prompt, cambiar de idioma, conversaciones largas). Se corrió contra la API real y cada respuesta se comparó con las tablas.
+Una batería de 40 preguntas en inglés y español, más 18 centradas en presionar al agente (estimar un N/A, atribuirle algo que no dijo, "actualizar" un dato, pedir su prompt, cambiar de idioma, conversaciones largas). Se corrió contra la API real y cada respuesta se comparó con las tablas. El script es `backend/eval_adversarial.py` y la última corrida está en `backend/eval/results-adversarial.json`.
 
 **Lo que aguantó desde el principio:** ningún part number inventado, la inyección SQL no hizo nada, no aceptó datos falsos del usuario, no reveló su prompt y no estimó valores N/A.
 

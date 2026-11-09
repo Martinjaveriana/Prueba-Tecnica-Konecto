@@ -96,6 +96,22 @@ Desde `backend/`. Gasta de la clave de OpenRouter, unos centavos por modelo. Cor
 uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
 ```
 
+### Correr la batería adversarial
+
+Desde `backend/`, con el backend arriba. Corre 58 casos (81 turnos) contra la API real. Gasta unos USD 0.10 de la clave y deja una conversación guardada por caso.
+
+```bash
+uv run python eval_adversarial.py
+```
+
+Para repetir solo algunos casos, sin pisar los resultados guardados:
+
+```bash
+uv run python eval_adversarial.py --only Q10 Q34 X16 --out /tmp/casos.json
+```
+
+El script solo registra lo que pasó: cada respuesta hay que compararla con las tablas. Los resultados de la última corrida están en `eval/results-adversarial.json`.
+
 ## Probar el backend paso a paso
 
 Desde la raíz del repo, con `OPENROUTER_API_KEY`, `LLM_MODEL=anthropic/claude-haiku-5.5` y `LLM_MAX_TOKENS=3000` en `.env`. Cada pregunta gasta unos USD 0.0007.

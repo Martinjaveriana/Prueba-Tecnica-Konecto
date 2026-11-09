@@ -59,6 +59,8 @@ cd backend && uv run uvicorn app.api:app --reload
 cd backend && uv run python eval_agent.py openai/gpt-5-mini anthropic/claude-haiku-5.5 qwen/qwen3.7-flash
 ```
 
+Batería adversarial de 58 casos contra la API real (backend arriba; gasta unos USD 0.10): `cd backend && uv run python eval_adversarial.py`, o `--only Q10 Q34` para unos pocos.
+
 Los tests usan un LLM falso (`tests/fake_llm.py`) y no gastan presupuesto. No hay linter configurado todavía.
 
 App Android (desde `android/`; `JAVA_HOME` apunta al Java de Android Studio). Los tests no necesitan emulador; `installDebug` necesita el emulador y el backend arriba:
