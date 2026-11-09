@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Soy Martín Sanmiguel, estudiante de 5.º semestre de Ingeniería de Sistemas (Colombia).
 - Estoy en proceso con **Konecto** (agentes de IA por voz/chat para empresas en Norteamérica). Ya pasé la entrevista inicial y la del CEO/cofundador.
 - Este es el **desafío técnico**. Si sale bien, sigue una última charla donde debo **explicar y defender mi arquitectura y trade-offs**, y luego la propuesta económica.
-- **Plazo:** 7 días desde el 4 de noviembre de 2026 → entregar a más tardar el **11 de noviembre de 2026** respondiendo el correo con el link al repo de GitHub.
+- **Plazo:** 7 días desde el correo del lunes 2 de noviembre de 2026, 6:11 p.m. → entregar a más tardar el **9 de noviembre de 2026, 6:11 p.m.**, respondiendo el correo con el link al repo de GitHub.
 
 ## Cómo quiero que me ayudes (instrucciones para el asistente)
 - Konecto **espera** que use IA para escribir el código. Lo que evalúan es que **yo entienda lo construido y las decisiones**. Por eso:
@@ -200,7 +200,7 @@ Trampas que el código debe respetar:
 ### App
 URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat con tarjetas o tabla comparativa a partir de `products`. Debug oculta, abierta con un gesto documentado en el README.
 
-## Plan de trabajo (4–11 nov)
+## Plan de trabajo (hasta el 9 nov)
 1. **Fase 0, hecha:** estructura del repo, Postgres en Docker, test de conexión.
 2. **Fase 1, hecha:** `ingest.py`, validación, tests y esquema. Repetir `--extract` da archivos idénticos. La auditoría con `gemini-3.5-flash` comparó 869 celdas y encontró una diferencia, en la que el PDF confirma nuestro dato.
 3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
