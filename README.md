@@ -111,10 +111,10 @@ A native app in Kotlin and Jetpack Compose, in `android/`, with three screens: t
 
 ### Run it
 
-You need Android Studio (or the Android SDK and JDK 17+) and the backend running.
+You need the backend running, and either Android Studio 2026.2 or later (built with 2026.2.2, which ships the Android Gradle Plugin 9.5.1 this project uses; an older one may refuse to open it) or, from a terminal, the Android SDK and JDK 17+. With the terminal the Android Studio version does not matter: Gradle downloads the SDK platform and build tools it is missing, as long as the SDK licenses are accepted.
 
 1. Start the backend from the repository root: `docker compose up -d --build --wait`.
-2. Start an emulator from Android Studio's Device Manager. The app was built and tested on Android 17 (API 37); it runs on Android 8 (API 26) and later.
+2. Start an emulator from Android Studio's Device Manager. Any image from Android 8 (API 26) up works: the app was run on Android 8.0 (API 26) and Android 17 (API 37).
 3. Open the `android/` folder in Android Studio and press Run. Or, from `android/` in a terminal, tell Gradle where the Android SDK is (Android Studio does this by itself; `~/Android/Sdk` is its default location on Linux) and install:
 
 ```bash
@@ -143,7 +143,7 @@ The debug screen is for developers, so it is hidden behind debug mode:
 
 1. On the conversations screen, **hold "New conversation" for 3 seconds**. A short tap still opens a new chat.
 2. Confirm **Enter debug mode?**. A red "Debug mode" label appears in the top bar, and the setting is kept on the phone.
-3. In any chat, **long-press an answer**. The debug screen shows the model, latency, tokens, whether every number in the answer came from the tools, and each tool call with its arguments, status and full output, which can be copied.
+3. In any chat, **long-press the text of an answer** (the grey bubble, not its product card). The debug screen shows the model, latency, tokens, whether every number in the answer came from the tools, and each tool call with its arguments, status and full output, which can be copied.
 
 Hold the button again and choose **Leave** to turn it off. Without debug mode, a long press on an answer does nothing.
 

@@ -481,6 +481,17 @@ Chat ──(pulsación larga en una respuesta)──> DebugScreen(session_id, me
 | Puerto 5433 para Postgres | El 5432 suele estar ocupado, como en esta máquina | Usar 5432 |
 | Modelos configurables por `.env` | `gemini-2.5-flash` dejó de estar disponible y solo hubo que cambiar una variable | Dejarlo fijo en el código |
 
+### Cómo se verificó que se puede correr
+
+| Prueba | Resultado |
+|---|---|
+| Clon limpio siguiendo el README, sin clave | Backend, ingesta, 173 tests del backend y 52 de la app pasan; sin clave, una pregunta responde 503 explicando qué falta |
+| `docker compose build --no-cache --pull` desde un clon | La imagen se construye desde cero y el backend carga los 68 modelos |
+| Compilar la app con un SDK que solo tiene las licencias aceptadas | Gradle descarga la plataforma 37, las build-tools y platform-tools, y genera el APK: desde la terminal no importa la versión de Android Studio |
+| App en Android 8.0 (API 26, el mínimo) y Android 17 (API 37) | Lista, tablas, pregunta real, modo debug y pantalla de debug, sin cierres. En Android 8 no aparece el permiso de red local, que solo existe en Android 17 |
+
+**Sin comprobar:** las versiones intermedias de Android (entre la 8 y la 17) y Android Studio anterior a 2026.2.
+
 ## Cómo se verificaron los datos
 
 1. **Reglas automáticas:** formato de cada valor, 68 filas, proporción entre in-lbs y Nm (±5 %), LRA ≥ FLA, y que 60 Hz no sea más lento que 50 Hz. Solo fallaron las 6 velocidades mal leídas.

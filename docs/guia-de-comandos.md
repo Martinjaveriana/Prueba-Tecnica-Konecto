@@ -326,7 +326,7 @@ Cada una prueba una vista distinta. Gastan de la clave (unos USD 0.0007 cada una
 ### Abrir la pantalla de debug
 
 1. En la lista, **mantener "New conversation" 3 segundos** y confirmar **Enter**. Aparece "Debug mode" en rojo arriba.
-2. En un chat, **pulsación larga sobre una respuesta**.
+2. En un chat, **pulsación larga sobre el texto de una respuesta** (la burbuja gris, no la tarjeta del producto).
 3. Para apagarlo: mantener otra vez el botón y elegir **Leave**.
 
 Desde la terminal, con el emulador (las coordenadas son las del emulador `Medium_Phone`):
