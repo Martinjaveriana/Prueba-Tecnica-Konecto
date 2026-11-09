@@ -202,18 +202,18 @@ The response of `POST /api/conversation`:
 | `session_id`, `answer` | The fields the assessment fixes |
 | `products` | The models the answer is about, always with the same fields (the `Product` schema in `/docs`), filled from the database. Each has a `role`: `specs`, `match`, `alternative`, `option`, `suggestion` or `no_data`. Alternatives add `differences`: why each one does not meet a requirement |
 | `focus` | The service and frequency the question was about, taken by code from the tool arguments. The app's comparison table opens there; `null` means On/Off at 60 Hz |
-| `needs_clarification` | `true` when the user must add information, such as a voltage or a torque unit |
+| `needs_clarification` | `true` when the user must add information, such as a voltage or a torque unit. It comes from the tool results; when no tool ran, from whether the answer asks something |
 | `debug` | Tools called, their arguments and results, model, tokens, latency and the number check. For the debug screen; end users do not see it |
 
-`products` and `needs_clarification` are built by code from the tool results, never from the model's text, so the app shows numbers that come from the database. Errors: `404` for an unknown conversation, `422` for an invalid request and `503` when the language model or the database is not available. A failed question is not saved.
+`products` is built by code from the tool results, never from the model's text, so the app shows numbers that come from the database. Errors: `404` for an unknown conversation, `422` for an invalid request and `503` when the language model or the database is not available. A failed question is not saved.
 
 If the database is down when the backend starts, the backend starts anyway, answers `503` and keeps retrying in the background; it loads the data and recovers by itself when the database is back. It does not crash, so Docker does not restart it in a loop.
 
 ## How the agent answers
 
-1. The backend loads the conversation from PostgreSQL and sends the model the text of the latest turns. After each earlier answer it adds the part numbers that answer looked up: `[Part numbers consulted: 762A00-11300000/A]`.
+1. The backend loads the conversation from PostgreSQL and sends the model the text of the latest 20 turns. If older turns exist, the model is told so, and asks instead of guessing when the user refers to one. After each earlier answer it adds the part numbers that answer looked up: `[Part numbers consulted: 762A00-11300000/A]`.
 2. The model calls a tool. For a follow-up such as "and how much power does it draw?" it looks the model up again with that exact part number, so the number comes from the database in this turn.
-3. Code checks that every number in the answer appears in what the tools returned. Any that does not is listed in `debug.unverified_numbers`.
+3. Code checks that every number in the answer appears in what the tools returned or in the arguments they received. Any that does not is listed in `debug.unverified_numbers`. The model is told not to do arithmetic: when a value has to be derived, such as the voltage range allowed by the datasheet (198-242 V for 220 V) or a torque in ft-lbs, code computes it and the tool returns it.
 4. The question and the answer are saved together, or not at all.
 
 ## Language model
@@ -243,6 +243,7 @@ Claude Haiku 5.5 passed every check in both runs, was the fastest, and costs abo
 The first run, with a limit of 1000 tokens, exposed three problems that were fixed before the final run:
 
 - **Cut answers:** GPT-5 mini and Qwen reason before answering, and with 1000 tokens some answers came out empty. The limit is now 3000, and a cut answer shows in `debug.finish_reason`.
+- **An adversarial round:** 58 cases in English and Spanish (81 turns) found three wrong answers, all fixed: "the highest torque model" lost the largest one to the result limit, the agent could not see the notes printed under the tables (voltage +/-10%, frequency +/-5%), and past 6 turns it took the oldest turn it could see for the first. After the fixes the 14 questions above still pass, 14/14 (`backend/eval/results-run4-after-adversarial-fixes.json`).
 - **Markdown tables in the answers:** Haiku wrote tables in 3 of 14 answers, which the app showed as raw `|` text next to its own table. The instructions now say not to, and `debug.markdown_table` measures it. A rerun with Haiku alone kept 14/14 with 0 tables (`backend/eval/results-run3-no-tables.json`).
 - **An internal marker in the answers:** all three models copied the `[Part numbers consulted]` line into their answers, Haiku in 9 of 14. Code now removes it, and `debug.marker_removed` records when it did.
 - **Off-topic answers:** Haiku answered "Paris" before redirecting. The instructions now tell the model not to answer.

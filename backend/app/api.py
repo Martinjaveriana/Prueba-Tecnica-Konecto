@@ -162,9 +162,10 @@ def converse(request: ConversationRequest, model: BaseChatModel | None = Depends
     if request.session_id and not conversations.session_exists(request.session_id):
         raise HTTPException(404, "Conversation not found.")
     history = conversations.history(request.session_id) if request.session_id else []
+    omitted = conversations.omitted_turns(request.session_id) if request.session_id else 0
 
     try:
-        result = run_turn(request.query, history, model)
+        result = run_turn(request.query, history, model, omitted_turns=omitted)
     except openai.APIStatusError as error:
         logger.error("Language model error %s: %s", error.status_code, error.message)
         raise HTTPException(503, f"The language model could not answer (HTTP {error.status_code}). Try again.")

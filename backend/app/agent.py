@@ -14,6 +14,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_openai import ChatOpenAI
 
+from app import language
 from app.config import settings
 from app.numbers import unverified_numbers
 from app.products import complete, focus_from, roles_from
@@ -28,6 +29,12 @@ Numbers
 - Earlier answers end with "[Part numbers consulted: ...]". When the user refers to a model from earlier,
   call get_actuator_specs with that exact part number.
 - Pass torque to the tools in the unit the user stated. Never convert units yourself.
+- If the user wants a model's torque in ft-lbs or kgf-m, call get_actuator_specs with convert_torque true, give
+  torque_ft_lbs_converted or torque_kgf_m_converted and say it is converted from the table. In search results, give
+  torque in the table's units without commenting on it.
+- Never do arithmetic: no sums, differences, ratios or percentages, not even simple ones. Give the values the
+  tools returned side by side and let the user compare them. If asked to calculate something, give those values
+  and say you cannot calculate it.
 - If the user gives a torque without a unit, ask for the unit before searching.
 
 How to answer
@@ -35,6 +42,17 @@ How to answer
   matters to decide.
 - Never write tables. Use short sentences or a short bullet list instead.
 - Always write full part numbers, such as 762A00-11300000/A.
+- Asked for the largest or most powerful model: call recommend_actuators with sort_by highest_torque. The first
+  result is the largest.
+- Search results come smallest first, so the first one is the smallest that qualifies even if more exist. With
+  shown lower than total, say how many you show out of the total.
+- Every model under matches already meets every requirement, in the unit the user stated: code checked it. Say so,
+  and never say you cannot tell whether it meets them.
+- In a result with closest_condition, that condition is only the one that came closest. It does not mean the model
+  is limited to that service or frequency.
+- Each model lookup gives operating_limits, the voltage and frequency ranges the datasheet allows, and
+  datasheet_notes. Mention them only if the user asks about tolerances or the notes: then say the range and whether
+  the value is inside it.
 - Several models match a part number or alias: list them briefly and ask which voltage or service is meant.
 - A part number is not in the tables: say so plainly and offer the suggested ones as a question. Never assume.
 - A model is listed as N/A: say the table gives no values for it, and mention the alternatives.
@@ -68,6 +86,12 @@ TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$", re.MULTILINE)
 EMPTY_ANSWER = "I could not finish the answer. Please ask again."
 MAX_CONSULTED = 8
 CLARIFICATION_STATUSES = {"ambiguous", "not_found", "needs_requirements", "invalid"}
+OMITTED_TURNS_NOTE = (
+    "\n\nThis conversation has older turns that you cannot see. If the user refers to something you cannot see, "
+    "such as the first model they asked about, say so and ask for the part number. Never guess it from the turns "
+    "you can see."
+)
+LANGUAGE_NOTE = "\n\nThe user's latest message is in {language}. Write your whole answer in {language}."
 
 
 @dataclass
@@ -124,9 +148,20 @@ def has_markdown_table(text: str) -> bool:
     return len(TABLE_ROW.findall(text)) >= 2
 
 
-def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None) -> TurnResult:
+def instructions(query: str, omitted_turns: int = 0) -> str:
+    """The fixed instructions, plus what only this turn can say."""
+    text = SYSTEM_PROMPT
+    if omitted_turns:
+        text += OMITTED_TURNS_NOTE
+    detected = language.detect(query)
+    if detected:
+        text += LANGUAGE_NOTE.format(language=detected)
+    return text
+
+
+def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None, omitted_turns: int = 0) -> TurnResult:
     started = time.monotonic()
-    agent = create_agent(model or build_chat_model(), TOOLS, system_prompt=SYSTEM_PROMPT)
+    agent = create_agent(model or build_chat_model(), TOOLS, system_prompt=instructions(query, omitted_turns))
     previous = history_messages(history)
     state = agent.invoke(
         {"messages": [*previous, HumanMessage(query)]},
@@ -159,7 +194,7 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
     needs_clarification = any(
         isinstance(call["output"], str) or call["output"].get("status") in CLARIFICATION_STATUSES
         for call in last_calls.values()
-    )
+    ) or (not tool_calls and "?" in answer)  # With no tool result, the text is the only signal there is.
 
     usage = [m.usage_metadata for m in new_messages if isinstance(m, AIMessage) and m.usage_metadata]
     debug = {
@@ -171,7 +206,8 @@ def run_turn(query: str, history: list[dict], model: BaseChatModel | None = None
         "marker_removed": CONSULTED_PREFIX in raw_answer,
         "markdown_table": has_markdown_table(answer),
         "unverified_numbers": unverified_numbers(
-            answer, [call["output"] for call in tool_calls] + [query, SYSTEM_PROMPT]
+            # The arguments hold requirements stated in earlier turns, such as the 60 of "at least 60 Nm".
+            answer, [call["output"] for call in tool_calls] + [call["args"] for call in tool_calls] + [query, SYSTEM_PROMPT]
         ),
         "part_numbers_consulted": consulted,
         "input_tokens": sum(u.get("input_tokens", 0) for u in usage),

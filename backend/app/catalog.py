@@ -17,6 +17,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field, model_validator
 
 from app.config import settings
+from ingestion.spec import DATASHEET_NOTES, FREQUENCY_TOLERANCE_PCT, VOLTAGE_TOLERANCE_PCT
 
 MAX_OPTIONS = 12
 MAX_SUGGESTIONS = 3
@@ -36,6 +37,8 @@ NOTE_SERVICE_UNSPECIFIED = (
 NOTE_SERVICE_REQUESTED = "The table does not say whether this rating applies to {service}."
 NOTE_NO_FREQUENCY = "The table for this model does not depend on the power frequency."
 SERVICE_NAMES = {"on_off": "On/Off", "modulating": "Modulating"}
+KGF_M_IN_NM = 9.80665
+IN_LBS_PER_FT_LB = 12
 
 
 class TorqueUnit(StrEnum):
@@ -86,6 +89,10 @@ class Requirements(BaseModel):
     max_motor_power_w: int | None = Field(None, gt=0, description="Maximum motor power, in watts.")
     certification: Certification | None = Field(None, description="Certification the model must have.")
     limit: int = Field(DEFAULT_LIMIT, gt=0, le=20, description="Maximum number of models to return.")
+    sort_by: Literal["tightest", "highest_torque"] = Field(
+        "tightest",
+        description="highest_torque when the user asks for the largest or most powerful model: the first result is it.",
+    )
 
     @model_validator(mode="after")
     def torque_needs_a_unit(self) -> "Requirements":
@@ -94,7 +101,8 @@ class Requirements(BaseModel):
         return self
 
     def is_empty(self) -> bool:
-        return not self.model_dump(exclude_none=True, exclude={"limit"})
+        # Asking for the largest model is a request in itself, with no other requirement.
+        return self.sort_by == "tightest" and not self.model_dump(exclude_none=True, exclude={"limit", "sort_by"})
 
 
 def _connect() -> psycopg.Connection:
@@ -162,6 +170,41 @@ def records(part_numbers) -> dict[str, dict]:
     return {a["part_number"]: _record(a) for a in _load_actuators() if a["part_number"] in wanted}
 
 
+def _operating_limits(actuator: dict) -> dict:
+    """The ranges the datasheet notes allow. Computed here so the LLM only has to compare."""
+
+    def limits(nominal: int, tolerance_pct: int) -> dict:
+        margin = nominal * tolerance_pct / 100
+        return {"nominal": nominal, "min": nominal - margin, "max": nominal + margin, "tolerance_pct": tolerance_pct}
+
+    return {
+        "voltage_v": limits(actuator["voltage_v"], VOLTAGE_TOLERANCE_PCT),
+        # 24 V models have no frequency in their tables, so no range can be stated for them.
+        "frequency_hz": [
+            limits(e["frequency_hz"], FREQUENCY_TOLERANCE_PCT)
+            for e in actuator["electrical_ratings"]
+            if e["frequency_hz"] is not None
+        ],
+    }
+
+
+def _lookup_record(actuator: dict, convert_torque: bool = False) -> dict:
+    """A model as a single lookup returns it: the record, plus what code works out from it."""
+    record = {**_record(actuator), "operating_limits": _operating_limits(actuator)}
+    if convert_torque:
+        # Units the PDF does not have, each from the column it converts exactly from. Only on request:
+        # when they were always present, the model volunteered them in answers that never asked.
+        record["service_ratings"] = [
+            {
+                **rating,
+                "torque_ft_lbs_converted": round(rating["torque_in_lbs"] / IN_LBS_PER_FT_LB, 1),
+                "torque_kgf_m_converted": round(rating["torque_nm"] / KGF_M_IN_NM, 1),
+            }
+            for rating in actuator["service_ratings"]
+        ]
+    return record
+
+
 def _summary(actuator: dict) -> dict:
     return {
         "part_number": actuator["part_number"],
@@ -176,10 +219,13 @@ def _summary(actuator: dict) -> dict:
 
 
 def _compact(text: str) -> str:
-    """Accept lowercase, spaces, a missing hyphen, the footnote mark and the letter O for zero."""
-    clean = re.sub(r"[\s*-]", "", text).upper()
+    """Accept what can only mean one model: case, spaces, a missing hyphen or slash, the footnote
+    mark, the suffix written first, and O or Q for zero. A digit that differs is never guessed."""
+    clean = re.sub(r"[\s*/-]", "", text).upper()
+    if clean.startswith("A76"):
+        clean = clean[1:] + "A"
     # The first 4 characters may hold letters; after them, only the C of the 3-phase code does.
-    return clean[:4] + clean[4:].replace("O", "0")
+    return clean[:4] + clean[4:].replace("O", "0").replace("Q", "0")
 
 
 def find_actuator(
@@ -187,6 +233,7 @@ def find_actuator(
     voltage_v: int | None = None,
     phases: int | None = None,
     service: str | None = None,
+    convert_torque: bool = False,
 ) -> dict:
     """Look up one model by full or partial part number, or by alias."""
     query = _compact(identifier)
@@ -231,15 +278,17 @@ def find_actuator(
             "query": identifier,
             "message": "Several models match. Show them or ask which voltage and service the user needs.",
             "total": len(narrowed),
+            "shown": min(len(narrowed), MAX_OPTIONS),
             "options": [_summary(a) for a in narrowed[:MAX_OPTIONS]],
         }
 
     actuator = narrowed[0]
     if actuator["has_data"]:
-        return {"status": "found", "actuator": _record(actuator)}
+        return {"status": "found", "actuator": _lookup_record(actuator, convert_torque), "datasheet_notes": list(DATASHEET_NOTES)}
     return {
         "status": "no_data",
-        "actuator": _record(actuator),
+        "actuator": _lookup_record(actuator),
+        "datasheet_notes": list(DATASHEET_NOTES),
         "alternatives": [_summary(a) for a in _alternatives_to_no_data(actuator, actuators)],
     }
 
@@ -356,6 +405,12 @@ def _torque_for_sorting(condition: dict, req: Requirements) -> int:
     return condition["_service"][column]
 
 
+def _largest_torque(evaluation: dict, req: Requirements) -> tuple[int, int]:
+    """The model's highest qualifying torque. In-lbs breaks ties: the PDF rounds Nm more coarsely."""
+    column = _required_torque(req)[0] if req.min_torque is not None else "torque_in_lbs"
+    return max((c["_service"][column], c["_service"]["torque_in_lbs"]) for c in evaluation["meets"])
+
+
 def _public(condition: dict) -> dict:
     return {key: value for key, value in condition.items() if key != "_service"}
 
@@ -446,10 +501,15 @@ def recommend(req: Requirements) -> dict:
             "closest": _closest(actuators, req),
         }
 
-    matches.sort(key=lambda m: (min(_torque_for_sorting(c, req) for c in m[1]["meets"]), m[0]["part_number"]))
+    if req.sort_by == "highest_torque":
+        matches.sort(key=lambda m: m[0]["part_number"])
+        matches.sort(key=lambda m: _largest_torque(m[1], req), reverse=True)
+    else:
+        matches.sort(key=lambda m: (min(_torque_for_sorting(c, req) for c in m[1]["meets"]), m[0]["part_number"]))
     return {
         "status": "matches",
         "total": len(matches),
+        "shown": min(len(matches), req.limit),
         "matches": [
             {
                 **actuator,
@@ -484,9 +544,14 @@ def available_options() -> dict:
         frequencies = conn.execute(
             "SELECT DISTINCT frequency_hz FROM electrical_ratings WHERE frequency_hz IS NOT NULL ORDER BY 1"
         ).fetchall()
+        hazardous = conn.execute(
+            "SELECT DISTINCT unnest(hazardous_classification) AS classification FROM actuators ORDER BY 1"
+        ).fetchall()
     return {
         "status": "ok",
         "power_supplies": supplies,
         "certifications": [row["certification"] for row in certifications],
         "frequencies_hz": [row["frequency_hz"] for row in frequencies],
+        "hazardous_classifications": [row["classification"] for row in hazardous],
+        "datasheet_notes": list(DATASHEET_NOTES),
     }

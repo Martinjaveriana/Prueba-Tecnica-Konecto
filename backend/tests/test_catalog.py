@@ -47,6 +47,10 @@ WEATHERPROOF_110 = {"enclosure": "weatherproof", "voltage_v": 110, "phases": 1}
         "761A00-11300000/A*",
         "761A00-11300000",
         "761A00-113OOOOO/A",
+        "761a0011300000a",
+        "761A00-11300000A",
+        "/A 761A00-11300000",
+        "761A00-113QQQQQ/A",
     ],
 )
 def test_a_part_number_is_found_however_it_is_written(text):
@@ -434,3 +438,89 @@ def test_a_database_failure_comes_back_as_a_message(monkeypatch):
     monkeypatch.setattr(catalog.settings, "database_url", "postgresql://nobody@127.0.0.1:1/none")
     result = get_actuator_specs.invoke({"identifier": "1A"})
     assert result["status"] == "error"
+
+
+# ---------- Found with the adversarial test suite ----------
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "763B00-11330000/A",  # one digit from a 110 V, a 220 V and a 3-phase model
+        "763000-11320000/A",  # one digit from the 3A, the 3B and the 3C
+        "761A00-11380000/A",  # the example of the summary, one digit from two real models
+    ],
+)
+def test_a_wrong_digit_is_never_resolved_to_a_model(text):
+    assert find_actuator(text)["status"] == "not_found"
+
+
+def test_normalizing_part_numbers_does_not_merge_two_models():
+    names = [row["part_number"] for row in catalog._load_actuators()]
+    assert len({catalog._compact(name) for name in names}) == len(names)
+
+
+def test_the_largest_model_is_not_cut_off_by_the_limit():
+    # 21 models qualify. Sorted smallest first, a limit of 20 dropped exactly the largest one.
+    result = recommend(Requirements(certification="CSA", voltage_v=220, phases=1, sort_by="highest_torque", limit=1))
+    assert result["total"] == 21
+    assert result["shown"] == 1
+    assert result["matches"][0]["part_number"] == "765B00-11320000/A"
+
+
+def test_a_tie_in_nm_is_broken_by_the_in_lbs_column():
+    # 765B00 and 765Y30 both give 3000 Nm, but 26,500 and 25,900 in-lbs.
+    names = [m["part_number"] for m in recommend(Requirements(voltage_v=220, phases=1, certification="CSA", sort_by="highest_torque", limit=2))["matches"]]
+    assert names == ["765B00-11320000/A", "765Y30-11320000/A"]
+
+
+def test_the_largest_model_can_be_asked_for_with_no_other_requirement():
+    result = recommend(Requirements(sort_by="highest_torque", limit=1))
+    assert result["status"] == "matches"
+    assert result["matches"][0]["part_number"] == "767C00-11320000/A"
+
+
+def test_the_default_order_is_still_the_tightest_fit():
+    names = [m["part_number"] for m in recommend(Requirements(min_torque=500, torque_unit="nm", voltage_v=110, enclosure="weatherproof", service="on_off"))["matches"]]
+    assert names[0] == "763B00-11300000/A"
+
+
+def test_results_say_how_many_are_shown():
+    assert recommend(Requirements(voltage_v=110, limit=3))["shown"] == 3
+    ambiguous = find_actuator("763")
+    assert (ambiguous["total"], ambiguous["shown"], len(ambiguous["options"])) == (15, 12, 12)
+
+
+def test_a_lookup_gives_the_voltage_and_frequency_ranges():
+    limits = find_actuator("762A00-11320000/A")["actuator"]["operating_limits"]
+    assert (limits["voltage_v"]["min"], limits["voltage_v"]["max"]) == (198, 242)
+    assert [(f["nominal"], f["min"], f["max"]) for f in limits["frequency_hz"]] == [(60, 57, 63), (50, 47.5, 52.5)]
+
+
+def test_a_24_v_model_has_a_voltage_range_but_no_frequency_range():
+    limits = find_actuator("761X30-11370000/A")["actuator"]["operating_limits"]
+    assert (limits["voltage_v"]["min"], limits["voltage_v"]["max"]) == (21.6, 26.4)
+    assert limits["frequency_hz"] == []
+
+
+def test_a_lookup_gives_the_datasheet_notes():
+    notes = " ".join(find_actuator("762A00-11320000/A")["datasheet_notes"])
+    assert "+/-10%" in notes and "+/-5%" in notes and "IEC 60034-1" in notes
+
+
+def test_torque_is_converted_by_code_from_the_exact_column():
+    ratings = find_actuator("762A00-11300000/A", convert_torque=True)["actuator"]["service_ratings"]
+    on_off = next(r for r in ratings if r["service"] == "on_off")
+    assert on_off["torque_ft_lbs_converted"] == round(1330 / 12, 1)
+    assert on_off["torque_kgf_m_converted"] == round(150 / 9.80665, 1)
+
+
+def test_torque_is_not_converted_unless_asked():
+    ratings = find_actuator("762A00-11300000/A")["actuator"]["service_ratings"]
+    assert all("torque_ft_lbs_converted" not in r for r in ratings)
+
+
+def test_the_catalog_lists_hazardous_classifications_and_notes():
+    options = catalog.available_options()
+    assert "Class I, Division 1, Groups C, D; T4" in options["hazardous_classifications"]
+    assert any("IEC 60034-1" in note for note in options["datasheet_notes"])

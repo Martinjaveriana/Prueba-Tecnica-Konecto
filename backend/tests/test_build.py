@@ -1,10 +1,12 @@
 import copy
 import json
+import re
 
 import pytest
 
 from ingest import CORRECTIONS_PATH, PROCESSED_PATH, RAW_PATH
 from ingestion.build import build, check_rules, expand_rows, normalize_part_number
+from ingestion.spec import FREQUENCY_TOLERANCE_PCT, VOLTAGE_TOLERANCE_PCT
 
 
 @pytest.fixture(scope="module")
@@ -180,3 +182,13 @@ def test_sizes_6_and_7_are_not_csa_certified(actuators):
 @pytest.mark.parametrize("alias, count", [("1A", 3), ("1X", 4), ("6A", 1)])
 def test_an_alias_can_cover_several_models(actuators, alias, count):
     assert sum(a["alias"] == alias for a in actuators.values()) == count
+
+
+def test_the_declared_notes_are_printed_on_every_page_of_the_pdf(raw):
+    # The notes are declared in spec.py. This keeps them tied to what Docling read from the PDF.
+    assert len(raw["page_texts"]) == 4
+    for lines in raw["page_texts"].values():
+        text = re.sub(r"\s", "", " ".join(lines)).lower()
+        assert f"voltagetolerance:+/-{VOLTAGE_TOLERANCE_PCT}%" in text
+        assert f"frequencytolerance:+/-{FREQUENCY_TOLERANCE_PCT}%" in text
+        assert "iec60034-1" in text

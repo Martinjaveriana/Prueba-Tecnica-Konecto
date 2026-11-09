@@ -9,7 +9,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from app import api
+from app import api, conversations
 from app.api import app, get_chat_model
 from app.config import settings
 from tests.fake_llm import call, say, scripted
@@ -204,3 +204,19 @@ def test_health_says_when_the_database_goes_down_after_starting(monkeypatch):
         response = client.get("/health")
     assert response.status_code == 503
     assert response.json()["database"] == "unavailable"
+
+
+def test_older_turns_are_counted_and_passed_to_the_agent(monkeypatch):
+    saved = conversations.save_turn(None, f"{MARK} first", "answer", [], False, {})
+    for _ in range(conversations.HISTORY_TURNS + 1):
+        conversations.save_turn(saved["session_id"], "again", "answer", [], False, {})
+    seen = {}
+
+    def fake_turn(query, history, model, omitted_turns=0):
+        seen.update(omitted=omitted_turns, turns=len(history) // 2)
+        raise openai.APIConnectionError(request=httpx.Request("POST", "http://x"))
+
+    monkeypatch.setattr("app.api.run_turn", fake_turn)
+    with client_with(say("unused")) as client:
+        ask(client, "And now?", saved["session_id"])
+    assert seen == {"omitted": 2, "turns": conversations.HISTORY_TURNS}

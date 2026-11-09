@@ -188,9 +188,9 @@ Trampas que el código debe respetar:
 - Agente con `create_agent` de LangChain, las 3 tools y OpenRouter mediante `langchain-openai`. Modelo configurable por `.env`; por defecto `anthropic/claude-haiku-5.5`, elegido con `eval_agent.py`. `LLM_MAX_TOKENS=3000`, porque los modelos que razonan dejaban respuestas vacías con 1000.
 - El código quita de la respuesta el marcador `[Part numbers consulted]`, porque los modelos lo copiaban.
 - Endpoints: `POST /api/conversation`, `GET /api/sessions`, `GET /api/sessions/{id}/messages`, `GET /health`.
-- Historial en tablas `sessions` y `messages`. Al LLM solo se le envía el texto de cada turno y, escrita por el código, la lista de part numbers consultados: `[Modelos consultados: 762A00-11300000/A]`. En los seguimientos vuelve a consultar la tool; nunca reutiliza números de turnos anteriores.
+- Historial en tablas `sessions` y `messages`. Al LLM se le envían los últimos 20 turnos (y un aviso si hay más antiguos): solo el texto de cada uno y, escrita por el código, la lista de part numbers consultados: `[Modelos consultados: 762A00-11300000/A]`. En los seguimientos vuelve a consultar la tool; nunca reutiliza números de turnos anteriores.
 - `products` y `needs_clarification` los decide el código a partir de lo que devolvieron las tools, no el LLM.
-- Un verificador revisa que cada número de la respuesta aparezca en lo que devolvieron las tools en ese turno; si no, lo marca en `debug`.
+- Un verificador revisa que cada número de la respuesta aparezca en lo que devolvieron las tools en ese turno o en sus argumentos; si no, lo marca en `debug`. El LLM no hace aritmética: rangos de tolerancia y conversiones a ft-lb y kgf·m los calcula el código.
 - `debug` siempre va en la respuesta; la app lo oculta.
 - El backend crea las tablas y carga los datos al arrancar. Un turno se guarda completo o no se guarda.
 - Los tests usan un LLM falso; la clave real solo para la comparación de modelos y unas pocas pruebas finales.
@@ -204,7 +204,8 @@ URL del backend configurable (emulador Android → `http://10.0.2.2:8000`). Chat
 3. **Fase 2, hecha:** `get_actuator_specs`, `recommend_actuators` y `list_available_options`, con sus edge cases probados sin LLM. Las reglas y sus razones están en `docs/decisiones-de-diseno.md`.
 4. **Fase 3, hecha:** agente, API, persistencia, verificador de números y Dockerfile. Modelo elegido: `anthropic/claude-haiku-5.5` (14/14, 3.2 s, USD 0.0007 por pregunta), comparado con GPT-5 mini y Qwen 3.7 Flash. Detalle en `docs/decisiones-de-diseno.md`.
 5. **Fase 4:** app Android. **4a hecha:** proyecto, lista, historial, estados de error y permiso de red local. **4b hecha:** envío con Retry, tarjetas, tabla comparativa abierta en `focus`, opciones para tocar, negritas y viñetas. **4c hecha:** modo debug (mantener "New conversation" 3 s y confirmar; luego pulsación larga sobre una respuesta) y README de la app con capturas en `docs/screenshots/`. Las instrucciones prohíben tablas Markdown (Haiku las escribía en 3 de 14); repetida la comparación con Haiku: 14/14, 0 tablas.
-6. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.
+6. **Pruebas adversariales, hechas:** 58 casos (81 turnos); corregidos Q10 (`sort_by`), notas del PDF, ventana de historial, normalización de part numbers, conversiones, cálculos, verificador e idioma. Detalle en `docs/decisiones-de-diseno.md`. Comparación final: 14/14.
+7. **Último día:** README completo, probar desde un clon limpio, revisar que no haya claves en el historial de git, enviar. Opcionales solo si sobra tiempo.
 
 ## Edge cases a cubrir y probar
 - Part number inexistente, mal escrito, con espacios/minúsculas.

@@ -30,18 +30,21 @@ def get_actuator_specs(
     voltage_v: int | None = None,
     phases: int | None = None,
     service: Service | None = None,
+    convert_torque: bool = False,
 ) -> dict:
     """Get the exact technical data of one Series 76 actuator.
 
-    Use it whenever the user names a model, and to answer follow-up questions about it.
+    Use it whenever the user names a model, and to answer follow-up questions about it. The result
+    also has the allowed voltage and frequency ranges and the datasheet notes.
 
     Args:
         identifier: The Base Part Number as the user wrote it, complete or partial, or a short alias such as 1A or 5X.
         voltage_v: Supply voltage in volts, to choose among several models.
         phases: Number of phases, to choose among several models.
         service: Service type, to choose among several models.
+        convert_torque: True only if the user asked for this model's torque in ft-lbs or kgf-m.
     """
-    return catalog.find_actuator(identifier, voltage_v=voltage_v, phases=phases, service=service)
+    return catalog.find_actuator(identifier, voltage_v=voltage_v, phases=phases, service=service, convert_torque=convert_torque)
 
 
 @tool(args_schema=Requirements)
@@ -59,7 +62,8 @@ def recommend_actuators(**requirements) -> dict:
 @tool
 @_report_database_errors
 def list_available_options() -> dict:
-    """List the enclosures, power supplies, services, torque ranges and certifications that exist.
+    """List the enclosures, power supplies, services, torque ranges, certifications, hazardous area
+    classifications and datasheet notes that exist.
 
     Use it for questions about what is available, or to offer valid choices.
     """

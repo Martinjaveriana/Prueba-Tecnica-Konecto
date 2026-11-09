@@ -9,8 +9,9 @@ from psycopg.types.json import Jsonb
 from app.config import settings
 
 TITLE_LENGTH = 60
-# The agent sees the last turns only: enough for follow-ups, without paying for a long history.
-HISTORY_TURNS = 6
+# The agent sees the last turns only. Beyond this it is told that some are missing (see agent.py),
+# because a model that cannot see the first turn takes the oldest one it can see for the first.
+HISTORY_TURNS = 20
 
 
 def _connect() -> psycopg.Connection:
@@ -56,6 +57,13 @@ def get_session(session_id: UUID) -> dict | None:
             (session_id,),
         ).fetchall()
     return session
+
+
+def omitted_turns(session_id: UUID) -> int:
+    """How many turns of this conversation are too old to reach the agent."""
+    with _connect() as conn:
+        total = conn.execute("SELECT count(*) AS n FROM messages WHERE session_id = %s", (session_id,)).fetchone()["n"]
+    return max(0, total // 2 - HISTORY_TURNS)
 
 
 def history(session_id: UUID) -> list[dict]:

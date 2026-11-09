@@ -33,6 +33,18 @@ HAZARDOUS_CLASSIFICATION = (
 # Footnote on page 1: "Sizes 6 and 7 are not CSA Certified".
 SIZES_WITHOUT_CSA = {6, 7}
 
+# The NOTES printed under the tables of all four pages.
+VOLTAGE_TOLERANCE_PCT = 10
+FREQUENCY_TOLERANCE_PCT = 5
+DATASHEET_NOTES = (
+    "Full load current (FLA) is measured at maximum rated load.",
+    "Locked rotor current (LRA) is measured at locked rotor load.",
+    f"Allowable motor voltage tolerance: +/-{VOLTAGE_TOLERANCE_PCT}%.",
+    f"Allowable power frequency tolerance: +/-{FREQUENCY_TOLERANCE_PCT}%.",
+    "Duty cycle per IEC 60034-1 for on/off and modulating service.",
+    "Starts and cycles per hour are based on rated torque.",
+)
+
 
 @dataclass(frozen=True)
 class TableSpec:
